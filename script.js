@@ -349,16 +349,19 @@ async function generatePdfWithJsPDF() {
         // Logo Section (left)
         doc.setFontSize(36);
         doc.setFont(undefined, 'bold');
-        doc.text("far", 20, 45);
-        doc.setTextColor(122, 181, 67); // Farmkart green
-        doc.text("m", 37, 45);
         doc.setTextColor(0);
-        doc.text("kart", 44, 45);
+        doc.text("fa", 20, 50);
+        doc.setTextColor(122, 181, 67); // Farmkart green
+        doc.text("r", 32, 50);
+        doc.setTextColor(0);
+        doc.text("mkart", 38, 50);
         
         doc.setFontSize(10);
         doc.setFont(undefined, 'normal');
-        doc.setTextColor(100);
-        doc.text("the next impact", 22, 52);
+        doc.setTextColor(0);
+        doc.text("the next ", 48, 57);
+        doc.setFont(undefined, 'bold');
+        doc.text("impact", 63, 57);
 
         // Company Info Section (right)
         doc.setFontSize(10);
