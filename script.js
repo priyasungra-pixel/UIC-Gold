@@ -361,7 +361,7 @@ async function generatePdfWithJsPDF() {
         doc.setTextColor(0);
         doc.text("the next ", 48, 54);
         doc.setFont(undefined, 'bold');
-        doc.text("impact", 63, 54);
+        doc.text("impact", 61, 54);
 
         // Company Info Section (right)
         doc.setFontSize(10);
