@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UIC Gold - Customer Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- PDF Generation Libraries (jsPDF + AutoTable is more reliable for local files) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <i data-lucide="shield-check" class="logo-icon"></i>
+                    <span>UIC Gold</span>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active" id="nav-gold-customer" onclick="switchView('gold-customer')">
+                    <i data-lucide="users"></i>
+                    <span>Gold Customer</span>
+                </a>
+                <a href="#" class="nav-item" id="nav-statements" onclick="switchView('statements')">
+                    <i data-lucide="file-text"></i>
+                    <span>Statements</span>
+                </a>
+                <a href="#" class="nav-item" id="nav-reports" onclick="switchView('reports')">
+                    <i data-lucide="bar-chart-3"></i>
+                    <span>Reports</span>
+                </a>
+                <a href="#" class="nav-item" id="nav-settings" onclick="switchView('settings')">
+                    <i data-lucide="settings"></i>
+                    <span>Settings</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-profile">
+                    <div class="avatar">A</div>
+                    <div class="user-info">
+                        <span class="user-name">Admin</span>
+                        <span class="user-role">Manager</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-header">
+                <div class="search-container">
+                    <i data-lucide="search" class="search-icon"></i>
+                    <input type="text" id="searchInput" placeholder="Search Gold Customer...">
+                </div>
+                <div class="header-actions">
+                    <button class="icon-btn" title="Refresh Data" id="refreshBtn" onclick="fetchData()">
+                        <i data-lucide="refresh-cw"></i>
+                    </button>
+                    <button class="icon-btn" title="Notifications">
+                        <i data-lucide="bell"></i>
+                    </button>
+                    <div class="avatar-sm">A</div>
+                </div>
+            </header>
+
+            <section class="content-body" id="view-gold-customer">
+                <div class="content-header">
+                    <div class="title-group">
+                        <h1>Gold Customer</h1>
+                        <p class="subtitle">Managing premium customer accounts and balances</p>
+                    </div>
+                    <div class="stats-group">
+                        <div class="stat-card">
+                            <span class="stat-label">Total Customers</span>
+                            <span class="stat-value" id="totalCustomers">-</span>
+                        </div>
+                        <div class="stat-card urgent">
+                            <span class="stat-label">Total Overdue</span>
+                            <span class="stat-value" id="totalOverdueAmount">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="errorMessage" class="error-banner" style="display: none;"></div>
+
+                <div class="table-container card">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="sortable" data-sort="name">Customer Name <i data-lucide="arrow-up-down"></i></th>
+                                <th class="sortable" data-sort="mobile">Number <i data-lucide="arrow-up-down"></i></th>
+                                <th>Status</th>
+                                <th class="sortable text-right" data-sort="totalOverdue">Total Overdue <i data-lucide="arrow-up-down"></i></th>
+                                <th class="sortable text-right" data-sort="totalPendingBalance">Total Pending Balance <i data-lucide="arrow-up-down"></i></th>
+                                <th class="actions-col">Statement</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <tr id="loader" class="loading-row">
+                                <td colspan="6">
+                                    <div class="loader-container">
+                                        <div class="loader"></div>
+                                        <span>Fetching data from Google Sheets...</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Statements View -->
+            <section class="content-body" id="view-statements" style="display: none;">
+                <div class="content-header">
+                    <div class="title-group">
+                        <h1>Statements</h1>
+                        <p class="subtitle">View and generate batch statements</p>
+                    </div>
+                </div>
+                <div class="stats-group" style="margin-bottom: 32px;">
+                    <div class="stat-card">
+                        <span class="stat-label">Pending Statements</span>
+                        <span class="stat-value">128</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Last Batch</span>
+                        <span class="stat-value" style="font-size: 1.1rem; margin-top: 8px;">2026-05-05</span>
+                    </div>
+                </div>
+                <div class="card" style="padding: 40px; text-align: center; color: var(--text-muted);">
+                    <i data-lucide="file-text" style="width: 48px; height: 48px; margin-bottom: 16px; opacity: 0.5;"></i>
+                    <h3>Batch Statements</h3>
+                    <p>Access individual customer statements from the <b>Gold Customer</b> list. Bulk generation tools are coming soon.</p>
+                </div>
+            </section>
+
+            <!-- Reports View -->
+            <section class="content-body" id="view-reports" style="display: none;">
+                <div class="content-header">
+                    <div class="title-group">
+                        <h1>Reports & Analytics</h1>
+                        <p class="subtitle">Visual insights into outstanding debt</p>
+                    </div>
+                </div>
+                <div class="stats-group" style="margin-bottom: 32px;">
+                    <div class="stat-card">
+                        <span class="stat-label">Recovery Rate</span>
+                        <span class="stat-value" style="color: var(--success);">84.2%</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Avg. Payment Delay</span>
+                        <span class="stat-value">12 Days</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Monthly Growth</span>
+                        <span class="stat-value" style="color: var(--primary-color);">+15%</span>
+                    </div>
+                </div>
+                <div class="card" style="padding: 40px; text-align: center; color: var(--text-muted);">
+                    <i data-lucide="bar-chart-3" style="width: 48px; height: 48px; margin-bottom: 16px; opacity: 0.5;"></i>
+                    <h3>Analytics Dashboard</h3>
+                    <p>Real-time trend analysis and PDF summary reports are currently in development.</p>
+                </div>
+            </section>
+
+            <!-- Settings View -->
+            <section class="content-body" id="view-settings" style="display: none;">
+                <div class="content-header">
+                    <div class="title-group">
+                        <h1>Settings</h1>
+                        <p class="subtitle">Configure dashboard preferences</p>
+                    </div>
+                </div>
+                <div class="card" style="padding: 24px;">
+                    <div style="margin-bottom: 24px;">
+                        <h4 style="margin-bottom: 8px;">System Configuration</h4>
+                        <p style="font-size: 0.9rem; color: var(--text-muted);">Manage overdue thresholds and spreadsheet connectivity.</p>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 16px; max-width: 400px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid var(--border-color);">
+                            <span>Overdue Threshold (Days)</span>
+                            <span style="font-weight: 600;">30 Days</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid var(--border-color);">
+                            <span>Currency Symbol</span>
+                            <span style="font-weight: 600;">Rs. (INR)</span>
+                        </div>
+                        <div style="padding: 12px; margin-top: 12px;">
+                            <button class="btn btn-primary" onclick="fetchData(); switchView('gold-customer')">
+                                <i data-lucide="refresh-cw"></i> Sync Data Now
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Statement Modal -->
+    <div id="statementModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Customer Statement</h2>
+                <div class="modal-actions">
+                    <button class="btn btn-primary" id="downloadPdfBtn">
+                        <i data-lucide="download"></i> Download PDF
+                    </button>
+                    <button class="icon-btn close-modal" id="closeModalBtn">
+                        <i data-lucide="x"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div class="statement-header">
+                    <div class="company-brand">
+                        <i data-lucide="shield-check" class="logo-icon"></i>
+                        <h3>UIC GOLD</h3>
+                    </div>
+                    <div class="statement-title">
+                        <h1>ACCOUNT STATEMENT</h1>
+                        <p id="stmtGeneratedAt"></p>
+                    </div>
+                </div>
+                
+                <div class="customer-summary">
+                    <div class="summary-col">
+                        <label>Customer Name</label>
+                        <p id="stmtCustomerName"></p>
+                    </div>
+                    <div class="summary-col">
+                        <label>Mobile Number</label>
+                        <p id="stmtCustomerMobile"></p>
+                    </div>
+                    <div class="summary-col">
+                        <label>Current Balance</label>
+                        <p id="stmtCurrentBalance" class="balance-text"></p>
+                    </div>
+                </div>
+
+                <table class="statement-table">
+                    <thead>
+                        <tr>
+                            <th style="text-align: left;">Date</th>
+                            <th style="text-align: left;">Description</th>
+                            <th style="text-align: left;">Type</th>
+                            <th style="text-align: left;">Status</th>
+                            <th style="text-align: right;">Original</th>
+                            <th style="text-align: right;">Outstanding</th>
+                        </tr>
+                    </thead>
+                    <tbody id="statementTableBody"></tbody>
+                </table>
+
+                <div class="statement-footer">
+                    <p>Generated for premium UIC Gold accounts.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toastContainer"></div>
+
+    <script src="script.js"></script>
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>
