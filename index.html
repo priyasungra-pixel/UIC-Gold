@@ -123,7 +123,12 @@
                         <h1>Batch Statements</h1>
                         <p class="subtitle">Select multiple customers to generate statements in bulk</p>
                     </div>
-                    <div class="action-group">
+                    <div class="action-group" style="display: flex; gap: 12px; align-items: center;">
+                        <select id="batchStatusFilter" class="btn" style="background: white; border: 1px solid var(--border-color); color: var(--text-main); font-weight: 500;" onchange="renderBatchTable()">
+                            <option value="all">All Status</option>
+                            <option value="overdue">Overdue Only</option>
+                            <option value="open">Open Only</option>
+                        </select>
                         <button class="btn btn-primary" onclick="downloadSelectedStatements()">
                             <i data-lucide="download"></i> Download Selected
                         </button>

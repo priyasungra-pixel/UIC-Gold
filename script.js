@@ -62,17 +62,25 @@ function renderBatchTable() {
     
     const searchInput = document.getElementById('searchInput');
     const term = searchInput ? searchInput.value.toLowerCase() : '';
+    const statusFilter = document.getElementById('batchStatusFilter') ? document.getElementById('batchStatusFilter').value : 'all';
     
-    const displayData = customersData.filter(c => 
-        c.name.toLowerCase().includes(term) || 
-        c.mobile.includes(term)
-    );
+    const displayData = customersData.filter(c => {
+        const matchesSearch = c.name.toLowerCase().includes(term) || c.mobile.includes(term);
+        const isOverdue = c.totalOverdue < 0;
+        
+        let matchesStatus = true;
+        if (statusFilter === 'overdue') matchesStatus = isOverdue;
+        if (statusFilter === 'open') matchesStatus = !isOverdue;
+        
+        return matchesSearch && matchesStatus;
+    });
 
     tbody.innerHTML = '';
     displayData.forEach(c => {
         const row = document.createElement('tr');
         const balanceClass = c.totalPendingBalance < 0 ? 'text-danger' : 'text-success';
-        const status = c.totalOverdue < 0 ? '<span class="status-badge status-overdue">OVERDUE</span>' : '<span class="status-badge status-open">OPEN</span>';
+        const isOverdue = c.totalOverdue < 0;
+        const status = isOverdue ? '<span class="status-badge status-overdue">OVERDUE</span>' : '<span class="status-badge status-open">OPEN</span>';
         
         row.innerHTML = `
             <td style="text-align: center;"><input type="checkbox" class="batch-checkbox" data-key="${c.key}"></td>
