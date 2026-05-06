@@ -284,6 +284,33 @@ h1, h2, h3, .logo {
 }
 
 /* Table Styles */
+.sortable {
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.2s;
+}
+
+.sortable:hover {
+    background-color: #f8fafc;
+}
+
+.sortable i {
+    width: 14px;
+    height: 14px;
+    margin-left: 4px;
+    opacity: 0.5;
+    vertical-align: middle;
+}
+
+.sortable.asc i, .sortable.desc i {
+    opacity: 1;
+    color: var(--primary-color);
+}
+
+.table-container {
+    width: 100%;
+}
+
 .card {
     background-color: white;
     border-radius: 16px;
@@ -292,9 +319,6 @@ h1, h2, h3, .logo {
     overflow: hidden;
 }
 
-.table-container {
-    width: 100%;
-}
 
 table {
     width: 100%;

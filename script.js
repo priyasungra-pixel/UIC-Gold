@@ -104,29 +104,29 @@ function renderBatchTable() {
 }
 
 function setupSorting() {
-    const headers = document.querySelectorAll('th.sortable');
-    headers.forEach(header => {
-        header.addEventListener('click', () => {
-            const column = header.dataset.sort;
-            sortConfig.direction = (sortConfig.column === column && sortConfig.direction === 'asc') ? 'desc' : 'asc';
-            sortConfig.column = column;
-            
-            // Sync all sort headers visuals
-            document.querySelectorAll('th.sortable').forEach(h => {
-                h.classList.remove('asc', 'desc');
-                if (h.dataset.sort === column) h.classList.add(sortConfig.direction);
-            });
+    document.addEventListener('click', (e) => {
+        const header = e.target.closest('th.sortable');
+        if (!header) return;
 
-            const activeNav = document.querySelector('.nav-item.active');
-            const currentView = activeNav ? activeNav.id.replace('nav-', '') : 'gold-customer';
-            
-            if (currentView === 'gold-customer') {
-                sortData(); // Sort filteredData
-                renderTable();
-            } else if (currentView === 'statements') {
-                renderBatchTable(); // Sorting handled inside
-            }
+        const column = header.dataset.sort;
+        sortConfig.direction = (sortConfig.column === column && sortConfig.direction === 'asc') ? 'desc' : 'asc';
+        sortConfig.column = column;
+        
+        // Sync all sort headers visuals
+        document.querySelectorAll('th.sortable').forEach(h => {
+            h.classList.remove('asc', 'desc');
+            if (h.dataset.sort === column) h.classList.add(sortConfig.direction);
         });
+
+        const activeNav = document.querySelector('.nav-item.active');
+        const currentView = activeNav ? activeNav.id.replace('nav-', '') : 'gold-customer';
+        
+        if (currentView === 'gold-customer') {
+            sortData();
+            renderTable();
+        } else if (currentView === 'statements') {
+            renderBatchTable();
+        }
     });
 }
 
