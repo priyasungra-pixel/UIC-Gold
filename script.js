@@ -103,31 +103,55 @@ function renderBatchTable() {
     });
 }
 
-function setupSorting() {
-    document.addEventListener('click', (e) => {
-        const header = e.target.closest('th.sortable');
-        if (!header) return;
+function handleBatchSort(column, element) {
+    // Toggle direction
+    sortConfig.direction = (sortConfig.column === column && sortConfig.direction === 'asc') ? 'desc' : 'asc';
+    sortConfig.column = column;
+    
+    // Refresh table based on current view
+    const activeNav = document.querySelector('.nav-item.active');
+    const currentView = activeNav ? activeNav.id.replace('nav-', '') : 'gold-customer';
+    
+    if (currentView === 'gold-customer') {
+        sortData();
+        renderTable();
+    } else {
+        renderBatchTable();
+    }
+    
+    // Update Icons
+    updateSortIcons();
+}
 
-        const column = header.dataset.sort;
-        sortConfig.direction = (sortConfig.column === column && sortConfig.direction === 'asc') ? 'desc' : 'asc';
-        sortConfig.column = column;
-        
-        // Sync all sort headers visuals
-        document.querySelectorAll('th.sortable').forEach(h => {
-            h.classList.remove('asc', 'desc');
-            if (h.dataset.sort === column) h.classList.add(sortConfig.direction);
-        });
+function updateSortIcons() {
+    const { column, direction } = sortConfig;
+    const icons = document.querySelectorAll('.sortable i');
+    icons.forEach(i => {
+        i.setAttribute('data-lucide', 'arrow-up-down');
+        i.style.color = 'inherit';
+        i.style.opacity = '0.5';
+    });
 
-        const activeNav = document.querySelector('.nav-item.active');
-        const currentView = activeNav ? activeNav.id.replace('nav-', '') : 'gold-customer';
-        
-        if (currentView === 'gold-customer') {
-            sortData();
-            renderTable();
-        } else if (currentView === 'statements') {
-            renderBatchTable();
+    // Handle both main table and batch table icons
+    const targets = [
+        `sort-icon-${column}`,
+        `sort-icon-${column}-main`
+    ];
+    
+    targets.forEach(id => {
+        const iconEl = document.getElementById(id);
+        if (iconEl) {
+            iconEl.setAttribute('data-lucide', direction === 'asc' ? 'chevron-up' : 'chevron-down');
+            iconEl.style.color = 'var(--primary-color)';
+            iconEl.style.opacity = '1';
         }
     });
+
+    lucide.createIcons();
+}
+
+function setupSorting() {
+    // Legacy setup - now handled by inline onclicks
 }
 
 function toggleAllBatch(source) {

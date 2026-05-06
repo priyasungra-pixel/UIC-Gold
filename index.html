@@ -94,12 +94,12 @@
                 <div class="table-container card">
                     <table>
                         <thead>
-                            <tr>
-                                <th class="sortable" data-sort="name">Customer Name <i data-lucide="arrow-up-down"></i></th>
-                                <th class="sortable" data-sort="mobile">Number <i data-lucide="arrow-up-down"></i></th>
+                            <tr id="mainTableHeader">
+                                <th class="sortable" onclick="handleBatchSort('name', this)">Customer Name <i data-lucide="arrow-up-down" id="sort-icon-name-main"></i></th>
+                                <th class="sortable" onclick="handleBatchSort('mobile', this)">Mobile <i data-lucide="arrow-up-down" id="sort-icon-mobile-main"></i></th>
                                 <th>Status</th>
-                                <th class="sortable text-right" data-sort="totalOverdue">Total Overdue <i data-lucide="arrow-up-down"></i></th>
-                                <th class="sortable text-right" data-sort="totalPendingBalance">Total Pending Balance <i data-lucide="arrow-up-down"></i></th>
+                                <th class="sortable text-right" onclick="handleBatchSort('totalOverdue', this)">Total Overdue <i data-lucide="arrow-up-down" id="sort-icon-totalOverdue-main"></i></th>
+                                <th class="sortable text-right" onclick="handleBatchSort('totalPendingBalance', this)">Total Pending Balance <i data-lucide="arrow-up-down" id="sort-icon-totalPendingBalance-main"></i></th>
                                 <th class="actions-col">Statement</th>
                             </tr>
                         </thead>
@@ -140,9 +140,9 @@
                         <thead>
                             <tr>
                                 <th style="width: 40px; text-align: center;"><input type="checkbox" id="selectAllBatch" onclick="toggleAllBatch(this)"></th>
-                                <th class="sortable" data-sort="name">Customer Name <i data-lucide="arrow-up-down"></i></th>
-                                <th class="sortable" data-sort="mobile">Mobile <i data-lucide="arrow-up-down"></i></th>
-                                <th class="sortable text-right" data-sort="totalPendingBalance">Total Balance <i data-lucide="arrow-up-down"></i></th>
+                                <th class="sortable" onclick="handleBatchSort('name', this)">Customer Name <i data-lucide="arrow-up-down" id="sort-icon-name"></i></th>
+                                <th class="sortable" onclick="handleBatchSort('mobile', this)">Mobile <i data-lucide="arrow-up-down" id="sort-icon-mobile"></i></th>
+                                <th class="sortable text-right" onclick="handleBatchSort('totalPendingBalance', this)">Total Balance <i data-lucide="arrow-up-down" id="sort-icon-totalPendingBalance"></i></th>
                                 <th style="width: 100px; text-align: center;">Status</th>
                             </tr>
                         </thead>
