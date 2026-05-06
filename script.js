@@ -295,8 +295,12 @@ function renderStatementRow(tbody, t) {
     const statusText = isOverdue ? 'OVERDUE' : 'OPEN';
     const statusClass = isOverdue ? 'status-overdue' : 'status-open';
 
+    const dueDate = t.date ? new Date(t.date) : null;
+    if (dueDate) dueDate.setDate(dueDate.getDate() + 30);
+
     row.innerHTML = `
         <td style="text-align: left !important; padding: 12px 16px !important;">${t.date ? t.date.toLocaleDateString() : 'N/A'}</td>
+        <td style="text-align: left !important; padding: 12px 16px !important;">${dueDate ? dueDate.toLocaleDateString() : 'N/A'}</td>
         <td style="text-align: left !important; padding: 12px 16px !important; text-transform: capitalize;">${t.type} ${isPartial ? '<span class="badge badge-success" style="font-size: 0.6rem; padding: 2px 6px;">PARTIAL</span>' : ''}</td>
         <td style="text-align: left !important; padding: 12px 16px !important;" class="stmt-type-order">DEBIT</td>
         <td style="text-align: left !important; padding: 12px 16px !important;"><span class="status-badge ${statusClass}">${statusText}</span></td>
@@ -398,8 +402,12 @@ async function generatePdfWithJsPDF() {
 
         const tableData = displayList.map(t => {
             const diffDays = t.date ? Math.floor((today - t.date) / (1000 * 60 * 60 * 24)) : 0;
+            const dueDate = t.date ? new Date(t.date) : null;
+            if (dueDate) dueDate.setDate(dueDate.getDate() + 30);
+
             return [
                 t.date ? t.date.toLocaleDateString() : 'N/A',
+                dueDate ? dueDate.toLocaleDateString() : 'N/A',
                 t.type.toUpperCase() + (t.outstandingAmount < t.amount ? ' (PARTIAL)' : ''),
                 'DEBIT',
                 diffDays > 30 ? 'OVERDUE' : 'OPEN',
@@ -410,18 +418,18 @@ async function generatePdfWithJsPDF() {
 
         doc.autoTable({
             startY: 110,
-            head: [['Date', 'Description', 'Type', 'Status', 'Original', 'Outstanding']],
+            head: [['Date', 'Due Date', 'Description', 'Type', 'Status', 'Original', 'Outstanding']],
             body: tableData,
             headStyles: { fillColor: [241, 245, 249], textColor: [71, 85, 105], fontStyle: 'bold' },
             alternateRowStyles: { fillColor: [248, 250, 252] },
             columnStyles: {
-                3: { fontStyle: 'bold' },
-                4: { halign: 'right' },
-                5: { halign: 'right', fontStyle: 'bold', textColor: [239, 68, 68] }
+                4: { fontStyle: 'bold' }, // Status column (index 4 now)
+                5: { halign: 'right' },
+                6: { halign: 'right', fontStyle: 'bold', textColor: [239, 68, 68] }
             },
             styles: { fontSize: 8 },
             didParseCell: function(data) {
-                if (data.section === 'body' && data.column.index === 3) {
+                if (data.section === 'body' && data.column.index === 4) {
                     if (data.cell.raw === 'OVERDUE') {
                         data.cell.styles.textColor = [153, 27, 27];
                     }
