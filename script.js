@@ -64,7 +64,7 @@ function renderBatchTable() {
     const term = searchInput ? searchInput.value.toLowerCase() : '';
     const statusFilter = document.getElementById('batchStatusFilter') ? document.getElementById('batchStatusFilter').value : 'all';
     
-    const displayData = customersData.filter(c => {
+    let displayData = customersData.filter(c => {
         const matchesSearch = c.name.toLowerCase().includes(term) || c.mobile.includes(term);
         const isOverdue = c.totalOverdue < 0;
         
@@ -73,6 +73,16 @@ function renderBatchTable() {
         if (statusFilter === 'open') matchesStatus = !isOverdue;
         
         return matchesSearch && matchesStatus;
+    });
+
+    // Apply Sorting
+    const { column, direction } = sortConfig;
+    const factor = direction === 'asc' ? 1 : -1;
+    displayData.sort((a, b) => {
+        let valA = a[column];
+        let valB = b[column];
+        if (typeof valA === 'string') return valA.localeCompare(valB) * factor;
+        return (valA - valB) * factor;
     });
 
     tbody.innerHTML = '';
@@ -90,6 +100,33 @@ function renderBatchTable() {
             <td style="text-align: center;">${status}</td>
         `;
         tbody.appendChild(row);
+    });
+}
+
+function setupSorting() {
+    const headers = document.querySelectorAll('th.sortable');
+    headers.forEach(header => {
+        header.addEventListener('click', () => {
+            const column = header.dataset.sort;
+            sortConfig.direction = (sortConfig.column === column && sortConfig.direction === 'asc') ? 'desc' : 'asc';
+            sortConfig.column = column;
+            
+            // Sync all sort headers visuals
+            document.querySelectorAll('th.sortable').forEach(h => {
+                h.classList.remove('asc', 'desc');
+                if (h.dataset.sort === column) h.classList.add(sortConfig.direction);
+            });
+
+            const activeNav = document.querySelector('.nav-item.active');
+            const currentView = activeNav ? activeNav.id.replace('nav-', '') : 'gold-customer';
+            
+            if (currentView === 'gold-customer') {
+                sortData(); // Sort filteredData
+                renderTable();
+            } else if (currentView === 'statements') {
+                renderBatchTable(); // Sorting handled inside
+            }
+        });
     });
 }
 
