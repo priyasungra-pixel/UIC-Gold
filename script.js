@@ -48,7 +48,7 @@ function switchView(viewId) {
             searchInput.disabled = true;
         }
     }
-    
+
     lucide.createIcons();
 }
 
@@ -81,7 +81,7 @@ function fetchData() {
     document.body.appendChild(script);
 }
 
-window.handleResponse = function(response) {
+window.handleResponse = function (response) {
     clearTimeout(fetchTimeout);
     if (!response || response.status === 'error') {
         showError("Google Sheet access error.");
@@ -154,14 +154,14 @@ function aggregateCustomerDataGviz(table) {
     Object.values(customers).forEach(c => {
         // Sort chronologically. Null dates go to the beginning.
         c.transactions.sort((a, b) => (a.date || 0) - (b.date || 0));
-        
+
         let runningBalance = 0;
         c.transactions.forEach(t => {
             if (t.isAdditive) runningBalance += t.amount;
             else runningBalance -= t.amount;
-            
+
             t.calculatedBalance = runningBalance;
-            
+
             if (t.date) {
                 if (t.date >= c.lastTransactionDate) {
                     c.lastTransactionDate = t.date;
@@ -172,7 +172,7 @@ function aggregateCustomerDataGviz(table) {
                 }
             }
         });
-        
+
         // Final balance is the running balance after ALL transactions
         c.totalPendingBalance = runningBalance;
 
@@ -236,7 +236,7 @@ function getOutstandingTransactions(customer) {
     let totalCredits = customer.transactions
         .filter(t => t.isAdditive)
         .reduce((sum, t) => sum + t.amount, 0);
-    
+
     // All transactions that subtract from balance (Orders, Deducts, Reverts, etc.)
     const allDebits = customer.transactions.filter(t => !t.isAdditive);
     const outstanding = [];
@@ -261,18 +261,18 @@ function getOutstandingTransactions(customer) {
 function openStatement(key) {
     const customer = customersData.find(c => c.key === key);
     if (!customer) return;
-    
+
     currentStatementCustomer = customer;
     document.getElementById('stmtCustomerName').textContent = customer.name;
     document.getElementById('stmtCustomerMobile').textContent = customer.mobile;
     document.getElementById('stmtCurrentBalance').textContent = `Rs.${customer.totalPendingBalance.toFixed(2)}`;
     document.getElementById('stmtGeneratedAt').textContent = new Date().toLocaleString();
-    
+
     const stmtTbody = document.getElementById('statementTableBody');
     stmtTbody.innerHTML = '';
-    
+
     const outstanding = getOutstandingTransactions(customer);
-    
+
     if (outstanding.length === 0) {
         if (customer.totalPendingBalance >= 0) {
             stmtTbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px; color: var(--success); font-weight: 600;">No outstanding items. Account is clear!</td></tr>';
@@ -317,7 +317,7 @@ function setupModal() {
             document.getElementById('statementModal').classList.remove('active');
         };
     }
-    
+
     const downloadBtn = document.getElementById('downloadPdfBtn');
     if (downloadBtn) {
         downloadBtn.onclick = () => {
@@ -345,7 +345,7 @@ async function generatePdfWithJsPDF() {
         doc.setFont(undefined, 'bold');
         doc.setTextColor(0);
         doc.text("UIC GOLD STATEMENT", 105, 20, { align: "center" });
-        
+
         // Underline for Title
         doc.setLineWidth(0.5);
         doc.line(70, 22, 140, 22);
@@ -359,7 +359,7 @@ async function generatePdfWithJsPDF() {
         doc.text("r", 32, 50);
         doc.setTextColor(0);
         doc.text("mkart", 38, 50);
-        
+
         doc.setFontSize(10);
         doc.setFont(undefined, 'normal');
         doc.setTextColor(0);
@@ -376,10 +376,10 @@ async function generatePdfWithJsPDF() {
         doc.setFontSize(9);
         doc.text("Anjad Road, Barwani -451551", 190, 45, { align: "right" });
         doc.text("Madhya Pradesh, India", 190, 50, { align: "right" });
-        doc.text("8823888238", 190, 55, { align: "right" });
+        doc.text("9407218000", 190, 55, { align: "right" });
         doc.text("contact@farmkart.com", 190, 60, { align: "right" });
         doc.text("www.farmkart.com, www.farmkartgroup.com", 190, 65, { align: "right" });
-        
+
         // Horizontal Divider
         doc.setDrawColor(200);
         doc.setLineWidth(0.1);
@@ -393,7 +393,7 @@ async function generatePdfWithJsPDF() {
         doc.text(`Name: ${c.name}`, 20, 87);
         doc.text(`Mobile: ${c.mobile}`, 20, 93);
         doc.text(`Net Account Balance: Rs.${c.totalPendingBalance.toFixed(2)}`, 20, 99);
-        
+
         doc.setFontSize(8);
         doc.setTextColor(150);
         doc.text(`Generated on: ${new Date().toLocaleString()}`, 190, 80, { align: "right" });
@@ -424,11 +424,11 @@ async function generatePdfWithJsPDF() {
             alternateRowStyles: { fillColor: [248, 250, 252] },
             columnStyles: {
                 4: { fontStyle: 'bold' }, // Status column (index 4 now)
-                5: { halign: 'right' },
-                6: { halign: 'right', fontStyle: 'bold', textColor: [239, 68, 68] }
+                5: { halign: 'left' },
+                6: { halign: 'left', fontStyle: 'bold', textColor: [239, 68, 68] }
             },
             styles: { fontSize: 8 },
-            didParseCell: function(data) {
+            didParseCell: function (data) {
                 if (data.section === 'body' && data.column.index === 4) {
                     if (data.cell.raw === 'OVERDUE') {
                         data.cell.styles.textColor = [153, 27, 27];
