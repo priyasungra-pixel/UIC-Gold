@@ -296,12 +296,12 @@ function renderStatementRow(tbody, t) {
     const statusClass = isOverdue ? 'status-overdue' : 'status-open';
 
     row.innerHTML = `
-        <td style="text-align: left;">${t.date ? t.date.toLocaleDateString() : 'N/A'}</td>
-        <td style="text-align: left; text-transform: capitalize;">${t.type} ${isPartial ? '<span class="badge badge-success" style="font-size: 0.6rem; padding: 2px 6px;">PARTIAL</span>' : ''}</td>
-        <td style="text-align: left;" class="stmt-type-order">DEBIT</td>
-        <td style="text-align: left;"><span class="status-badge ${statusClass}">${statusText}</span></td>
-        <td style="text-align: right;">Rs.${t.amount.toFixed(2)}</td>
-        <td style="text-align: right;" class="stmt-type-order">Rs.${t.outstandingAmount.toFixed(2)}</td>
+        <td style="text-align: left !important; padding: 12px 16px !important;">${t.date ? t.date.toLocaleDateString() : 'N/A'}</td>
+        <td style="text-align: left !important; padding: 12px 16px !important; text-transform: capitalize;">${t.type} ${isPartial ? '<span class="badge badge-success" style="font-size: 0.6rem; padding: 2px 6px;">PARTIAL</span>' : ''}</td>
+        <td style="text-align: left !important; padding: 12px 16px !important;" class="stmt-type-order">DEBIT</td>
+        <td style="text-align: left !important; padding: 12px 16px !important;"><span class="status-badge ${statusClass}">${statusText}</span></td>
+        <td style="text-align: right !important; padding: 12px 16px !important;">Rs.${t.amount.toFixed(2)}</td>
+        <td style="text-align: right !important; padding: 12px 16px !important;" class="stmt-type-order">Rs.${t.outstandingAmount.toFixed(2)}</td>
     `;
     tbody.appendChild(row);
 }
