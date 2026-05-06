@@ -336,30 +336,60 @@ async function generatePdfWithJsPDF() {
         const doc = new jsPDF();
         const c = currentStatementCustomer;
 
+        // Header Title
         doc.setFontSize(22);
-        doc.setTextColor(16, 185, 129);
-        doc.text("UIC GOLD", 105, 20, { align: "center" });
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(0);
+        doc.text("UIC GOLD STATEMENT", 105, 20, { align: "center" });
         
-        doc.setFontSize(14);
-        doc.setTextColor(100);
-        doc.text("OUTSTANDING DEBT STATEMENT", 105, 30, { align: "center" });
-        
-        doc.setDrawColor(16, 185, 129);
-        doc.setLineWidth(1);
-        doc.line(20, 35, 190, 35);
+        // Underline for Title
+        doc.setLineWidth(0.5);
+        doc.line(70, 22, 140, 22);
 
+        // Logo Section (left)
+        doc.setFontSize(36);
+        doc.setFont(undefined, 'bold');
+        doc.text("far", 20, 45);
+        doc.setTextColor(122, 181, 67); // Farmkart green
+        doc.text("m", 37, 45);
+        doc.setTextColor(0);
+        doc.text("kart", 44, 45);
+        
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'normal');
+        doc.setTextColor(100);
+        doc.text("the next impact", 22, 52);
+
+        // Company Info Section (right)
         doc.setFontSize(10);
         doc.setTextColor(0);
         doc.setFont(undefined, 'bold');
-        doc.text("CUSTOMER DETAILS", 20, 45);
+        doc.text("Farmkart Online Services Pvt. Ltd.", 190, 40, { align: "right" });
         doc.setFont(undefined, 'normal');
-        doc.text(`Name: ${c.name}`, 20, 52);
-        doc.text(`Mobile: ${c.mobile}`, 20, 58);
-        doc.text(`Net Account Balance: Rs.${c.totalPendingBalance.toFixed(2)}`, 20, 64);
+        doc.setFontSize(9);
+        doc.text("Anjad Road, Barwani -451551", 190, 45, { align: "right" });
+        doc.text("Madhya Pradesh, India", 190, 50, { align: "right" });
+        doc.text("8823888238", 190, 55, { align: "right" });
+        doc.text("contact@farmkart.com", 190, 60, { align: "right" });
+        doc.text("www.farmkart.com, www.farmkartgroup.com", 190, 65, { align: "right" });
+        
+        // Horizontal Divider
+        doc.setDrawColor(200);
+        doc.setLineWidth(0.1);
+        doc.line(20, 70, 190, 70);
+
+        // Customer Details Section
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'bold');
+        doc.text("CUSTOMER DETAILS", 20, 80);
+        doc.setFont(undefined, 'normal');
+        doc.text(`Name: ${c.name}`, 20, 87);
+        doc.text(`Mobile: ${c.mobile}`, 20, 93);
+        doc.text(`Net Account Balance: Rs.${c.totalPendingBalance.toFixed(2)}`, 20, 99);
         
         doc.setFontSize(8);
         doc.setTextColor(150);
-        doc.text(`Generated on: ${new Date().toLocaleString()}`, 190, 45, { align: "right" });
+        doc.text(`Generated on: ${new Date().toLocaleString()}`, 190, 80, { align: "right" });
 
         const displayList = getOutstandingTransactions(c);
 
@@ -376,7 +406,7 @@ async function generatePdfWithJsPDF() {
         });
 
         doc.autoTable({
-            startY: 75,
+            startY: 110,
             head: [['Date', 'Description', 'Type', 'Status', 'Original', 'Outstanding']],
             body: tableData,
             headStyles: { fillColor: [241, 245, 249], textColor: [71, 85, 105], fontStyle: 'bold' },
