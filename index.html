@@ -117,28 +117,34 @@
                 </div>
             </section>
 
-            <!-- Statements View -->
             <section class="content-body" id="view-statements" style="display: none;">
                 <div class="content-header">
                     <div class="title-group">
-                        <h1>Statements</h1>
-                        <p class="subtitle">View and generate batch statements</p>
+                        <h1>Batch Statements</h1>
+                        <p class="subtitle">Select multiple customers to generate statements in bulk</p>
+                    </div>
+                    <div class="action-group">
+                        <button class="btn btn-primary" onclick="downloadSelectedStatements()">
+                            <i data-lucide="download"></i> Download Selected
+                        </button>
                     </div>
                 </div>
-                <div class="stats-group" style="margin-bottom: 32px;">
-                    <div class="stat-card">
-                        <span class="stat-label">Pending Statements</span>
-                        <span class="stat-value">128</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-label">Last Batch</span>
-                        <span class="stat-value" style="font-size: 1.1rem; margin-top: 8px;">2026-05-05</span>
-                    </div>
-                </div>
-                <div class="card" style="padding: 40px; text-align: center; color: var(--text-muted);">
-                    <i data-lucide="file-text" style="width: 48px; height: 48px; margin-bottom: 16px; opacity: 0.5;"></i>
-                    <h3>Batch Statements</h3>
-                    <p>Access individual customer statements from the <b>Gold Customer</b> list. Bulk generation tools are coming soon.</p>
+                
+                <div class="table-container">
+                    <table class="batch-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px; text-align: center;"><input type="checkbox" id="selectAllBatch" onclick="toggleAllBatch(this)"></th>
+                                <th>Customer Name</th>
+                                <th>Mobile</th>
+                                <th class="text-right">Total Balance</th>
+                                <th style="width: 100px; text-align: center;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="batchTableBody">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
                 </div>
             </section>
 

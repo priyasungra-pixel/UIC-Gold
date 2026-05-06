@@ -43,6 +43,10 @@ function switchView(viewId) {
         if (viewId === 'gold-customer') {
             searchInput.placeholder = "Search Gold Customer...";
             searchInput.disabled = false;
+        } else if (viewId === 'statements') {
+            searchInput.placeholder = "Search batch list...";
+            searchInput.disabled = false;
+            renderBatchTable();
         } else {
             searchInput.placeholder = "Search disabled in this view";
             searchInput.disabled = true;
@@ -50,6 +54,172 @@ function switchView(viewId) {
     }
 
     lucide.createIcons();
+}
+
+function renderBatchTable() {
+    const tbody = document.getElementById('batchTableBody');
+    if (!tbody) return;
+    
+    const searchInput = document.getElementById('searchInput');
+    const term = searchInput ? searchInput.value.toLowerCase() : '';
+    
+    const displayData = customersData.filter(c => 
+        c.name.toLowerCase().includes(term) || 
+        c.mobile.includes(term)
+    );
+
+    tbody.innerHTML = '';
+    displayData.forEach(c => {
+        const row = document.createElement('tr');
+        const balanceClass = c.totalPendingBalance < 0 ? 'text-danger' : 'text-success';
+        const status = c.totalOverdue < 0 ? '<span class="status-badge status-overdue">OVERDUE</span>' : '<span class="status-badge status-open">OPEN</span>';
+        
+        row.innerHTML = `
+            <td style="text-align: center;"><input type="checkbox" class="batch-checkbox" data-key="${c.key}"></td>
+            <td style="font-weight: 500;">${c.name}</td>
+            <td>${c.mobile}</td>
+            <td class="text-right ${balanceClass}" style="font-weight: 600;">Rs.${c.totalPendingBalance.toFixed(2)}</td>
+            <td style="text-align: center;">${status}</td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function toggleAllBatch(source) {
+    const checkboxes = document.querySelectorAll('.batch-checkbox');
+    checkboxes.forEach(cb => cb.checked = source.checked);
+}
+
+async function downloadSelectedStatements() {
+    const selectedKeys = Array.from(document.querySelectorAll('.batch-checkbox:checked'))
+        .map(cb => cb.getAttribute('data-key'));
+    
+    if (selectedKeys.length === 0) {
+        showToast("Please select at least one customer", "error");
+        return;
+    }
+
+    showToast(`Generating ${selectedKeys.length} statements...`);
+    
+    for (const key of selectedKeys) {
+        const customer = customersData.find(c => c.key === key);
+        if (customer) {
+            await generateStatementPDF(customer);
+            await new Promise(resolve => setTimeout(resolve, 800));
+        }
+    }
+    
+    showToast("Batch Download Complete!");
+}
+
+async function generateStatementPDF(c) {
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        // Header Title
+        doc.setFontSize(22);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(0);
+        doc.text("UIC GOLD STATEMENT", 105, 20, { align: "center" });
+        
+        doc.setLineWidth(0.5);
+        doc.line(70, 22, 140, 22);
+
+        // Logo Section
+        doc.setFontSize(36);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(0);
+        doc.text("fa", 20, 50);
+        doc.setTextColor(122, 181, 67);
+        doc.text("r", 32, 50);
+        doc.setTextColor(0);
+        doc.text("mkart", 38, 50);
+        
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'normal');
+        doc.text("the next ", 48, 54);
+        doc.setFont(undefined, 'bold');
+        doc.text("impact", 61, 54);
+
+        // Company Info
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'bold');
+        doc.text("Farmkart Online Services Pvt. Ltd.", 190, 40, { align: "right" });
+        doc.setFont(undefined, 'normal');
+        doc.setFontSize(9);
+        doc.text("Anjad Road, Barwani -451551", 190, 45, { align: "right" });
+        doc.text("Madhya Pradesh, India", 190, 50, { align: "right" });
+        doc.text("9407218000", 190, 55, { align: "right" });
+        doc.text("contact@farmkart.com", 190, 60, { align: "right" });
+        doc.text("www.farmkart.com, www.farmkartgroup.com", 190, 65, { align: "right" });
+        
+        doc.setDrawColor(200);
+        doc.setLineWidth(0.1);
+        doc.line(20, 70, 190, 70);
+
+        // Customer Details
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'bold');
+        doc.text("CUSTOMER DETAILS", 20, 80);
+        doc.setFont(undefined, 'normal');
+        doc.text(`Name: ${c.name}`, 20, 87);
+        doc.text(`Mobile: ${c.mobile}`, 20, 93);
+        doc.text(`Net Account Balance: Rs.${c.totalPendingBalance.toFixed(2)}`, 20, 99);
+        
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text(`Generated on: ${new Date().toLocaleString()}`, 190, 80, { align: "right" });
+
+        const displayList = getOutstandingTransactions(c);
+        const tableData = displayList.map(t => {
+            const diffDays = t.date ? Math.floor((today - t.date) / (1000 * 60 * 60 * 24)) : 0;
+            const dueDate = t.date ? new Date(t.date) : null;
+            if (dueDate) dueDate.setDate(dueDate.getDate() + 30);
+            return [
+                t.date ? t.date.toLocaleDateString() : 'N/A',
+                dueDate ? dueDate.toLocaleDateString() : 'N/A',
+                t.type.toUpperCase() + (t.outstandingAmount < t.amount ? ' (PARTIAL)' : ''),
+                'DEBIT',
+                diffDays > 30 ? 'OVERDUE' : 'OPEN',
+                'Rs.' + t.amount.toFixed(2),
+                'Rs.' + t.outstandingAmount.toFixed(2)
+            ];
+        });
+
+        doc.autoTable({
+            startY: 110,
+            head: [['Date', 'Due Date', 'Description', 'Type', 'Status', 'Original', 'Outstanding']],
+            body: tableData,
+            headStyles: { fillColor: [241, 245, 249], textColor: [71, 85, 105], fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [248, 250, 252] },
+            columnStyles: {
+                4: { fontStyle: 'bold' },
+                5: { halign: 'left' },
+                6: { halign: 'left', fontStyle: 'bold', textColor: [239, 68, 68] }
+            },
+            styles: { fontSize: 8 },
+            didParseCell: function (data) {
+                if (data.section === 'body' && data.column.index === 4) {
+                    if (data.cell.raw === 'OVERDUE') data.cell.styles.textColor = [153, 27, 27];
+                }
+            }
+        });
+
+        const pageCount = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            doc.setFontSize(8);
+            doc.setTextColor(150);
+            doc.text("UIC Gold - Secure Premium Customer Portal", 105, 285, { align: "center" });
+            doc.text(`Page ${i} of ${pageCount}`, 190, 285, { align: "right" });
+        }
+
+        doc.save(`Statement_${c.name.replace(/\s+/g, '_')}.pdf`);
+    } catch (err) {
+        console.error(err);
+        throw err;
+    }
 }
 
 function init() {
@@ -335,122 +505,9 @@ function setupModal() {
 }
 
 async function generatePdfWithJsPDF() {
-    try {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        const c = currentStatementCustomer;
-
-        // Header Title
-        doc.setFontSize(22);
-        doc.setFont(undefined, 'bold');
-        doc.setTextColor(0);
-        doc.text("UIC GOLD STATEMENT", 105, 20, { align: "center" });
-
-        // Underline for Title
-        doc.setLineWidth(0.5);
-        doc.line(70, 22, 140, 22);
-
-        // Logo Section (left)
-        doc.setFontSize(36);
-        doc.setFont(undefined, 'bold');
-        doc.setTextColor(0);
-        doc.text("fa", 20, 50);
-        doc.setTextColor(122, 181, 67); // Farmkart green
-        doc.text("r", 32, 50);
-        doc.setTextColor(0);
-        doc.text("mkart", 38, 50);
-
-        doc.setFontSize(10);
-        doc.setFont(undefined, 'normal');
-        doc.setTextColor(0);
-        doc.text("the next ", 48, 54);
-        doc.setFont(undefined, 'bold');
-        doc.text("impact", 61, 54);
-
-        // Company Info Section (right)
-        doc.setFontSize(10);
-        doc.setTextColor(0);
-        doc.setFont(undefined, 'bold');
-        doc.text("Farmkart Online Services Pvt. Ltd.", 190, 40, { align: "right" });
-        doc.setFont(undefined, 'normal');
-        doc.setFontSize(9);
-        doc.text("Anjad Road, Barwani -451551", 190, 45, { align: "right" });
-        doc.text("Madhya Pradesh, India", 190, 50, { align: "right" });
-        doc.text("9407218000", 190, 55, { align: "right" });
-        doc.text("contact@farmkart.com", 190, 60, { align: "right" });
-        doc.text("www.farmkart.com, www.farmkartgroup.com", 190, 65, { align: "right" });
-
-        // Horizontal Divider
-        doc.setDrawColor(200);
-        doc.setLineWidth(0.1);
-        doc.line(20, 70, 190, 70);
-
-        // Customer Details Section
-        doc.setFontSize(10);
-        doc.setFont(undefined, 'bold');
-        doc.text("CUSTOMER DETAILS", 20, 80);
-        doc.setFont(undefined, 'normal');
-        doc.text(`Name: ${c.name}`, 20, 87);
-        doc.text(`Mobile: ${c.mobile}`, 20, 93);
-        doc.text(`Net Account Balance: Rs.${c.totalPendingBalance.toFixed(2)}`, 20, 99);
-
-        doc.setFontSize(8);
-        doc.setTextColor(150);
-        doc.text(`Generated on: ${new Date().toLocaleString()}`, 190, 80, { align: "right" });
-
-        const displayList = getOutstandingTransactions(c);
-
-        const tableData = displayList.map(t => {
-            const diffDays = t.date ? Math.floor((today - t.date) / (1000 * 60 * 60 * 24)) : 0;
-            const dueDate = t.date ? new Date(t.date) : null;
-            if (dueDate) dueDate.setDate(dueDate.getDate() + 30);
-
-            return [
-                t.date ? t.date.toLocaleDateString() : 'N/A',
-                dueDate ? dueDate.toLocaleDateString() : 'N/A',
-                t.type.toUpperCase() + (t.outstandingAmount < t.amount ? ' (PARTIAL)' : ''),
-                'DEBIT',
-                diffDays > 30 ? 'OVERDUE' : 'OPEN',
-                'Rs.' + t.amount.toFixed(2),
-                'Rs.' + t.outstandingAmount.toFixed(2)
-            ];
-        });
-
-        doc.autoTable({
-            startY: 110,
-            head: [['Date', 'Due Date', 'Description', 'Type', 'Status', 'Original', 'Outstanding']],
-            body: tableData,
-            headStyles: { fillColor: [241, 245, 249], textColor: [71, 85, 105], fontStyle: 'bold' },
-            alternateRowStyles: { fillColor: [248, 250, 252] },
-            columnStyles: {
-                4: { fontStyle: 'bold' }, // Status column (index 4 now)
-                5: { halign: 'left' },
-                6: { halign: 'left', fontStyle: 'bold', textColor: [239, 68, 68] }
-            },
-            styles: { fontSize: 8 },
-            didParseCell: function (data) {
-                if (data.section === 'body' && data.column.index === 4) {
-                    if (data.cell.raw === 'OVERDUE') {
-                        data.cell.styles.textColor = [153, 27, 27];
-                    }
-                }
-            }
-        });
-
-        const pageCount = doc.internal.getNumberOfPages();
-        for (let i = 1; i <= pageCount; i++) {
-            doc.setPage(i);
-            doc.setFontSize(8);
-            doc.setTextColor(150);
-            doc.text("UIC Gold - Secure Premium Customer Portal", 105, 285, { align: "center" });
-            doc.text(`Page ${i} of ${pageCount}`, 190, 285, { align: "right" });
-        }
-
-        doc.save(`Debt_Statement_${c.name.replace(/\s+/g, '_')}.pdf`);
+    if (currentStatementCustomer) {
+        await generateStatementPDF(currentStatementCustomer);
         showToast("PDF Downloaded!");
-    } catch (err) {
-        console.error(err);
-        showToast("PDF failed.", "error");
     }
 }
 
@@ -458,9 +515,16 @@ function setupSearch() {
     const searchInput = document.getElementById('searchInput');
     if (searchInput) {
         searchInput.addEventListener('input', (e) => {
-            const term = e.target.value.toLowerCase();
-            filteredData = customersData.filter(c => c.name.toLowerCase().includes(term) || c.mobile.includes(term));
-            renderTable();
+            const activeNav = document.querySelector('.nav-item.active');
+            const currentView = activeNav ? activeNav.id.replace('nav-', '') : 'gold-customer';
+            
+            if (currentView === 'gold-customer') {
+                const term = e.target.value.toLowerCase();
+                filteredData = customersData.filter(c => c.name.toLowerCase().includes(term) || c.mobile.includes(term));
+                renderTable();
+            } else if (currentView === 'statements') {
+                renderBatchTable();
+            }
         });
     }
 }
