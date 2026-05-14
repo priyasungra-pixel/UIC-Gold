@@ -96,7 +96,7 @@ function renderBatchTable() {
             <td style="text-align: center;"><input type="checkbox" class="batch-checkbox" data-key="${c.key}"></td>
             <td style="font-weight: 500;">${c.name}</td>
             <td>${c.mobile}</td>
-            <td class="text-right ${balanceClass}" style="font-weight: 600;">Rs.${c.totalPendingBalance.toFixed(2)}</td>
+            <td class="text-right ${balanceClass}" style="font-weight: 600;">${c.totalPendingBalance.toFixed(2)}</td>
             <td style="text-align: center;">${status}</td>
         `;
         tbody.appendChild(row);
@@ -234,7 +234,7 @@ async function generateStatementPDF(c) {
         doc.setFont(undefined, 'normal');
         doc.text(`Name: ${c.name}`, 20, 87);
         doc.text(`Mobile: ${c.mobile}`, 20, 93);
-        doc.text(`Net Account Balance: Rs.${c.totalPendingBalance.toFixed(2)}`, 20, 99);
+        doc.text(`Net Account Balance: ${c.totalPendingBalance.toFixed(2)}`, 20, 99);
         
         doc.setFontSize(8);
         doc.setTextColor(150);
@@ -251,8 +251,8 @@ async function generateStatementPDF(c) {
                 t.type.toUpperCase() + (t.outstandingAmount < t.amount ? ' (PARTIAL)' : ''),
                 'DEBIT',
                 diffDays > 30 ? 'OVERDUE' : 'OPEN',
-                'Rs.' + t.amount.toFixed(2),
-                'Rs.' + t.outstandingAmount.toFixed(2)
+                t.amount.toFixed(2),
+                t.outstandingAmount.toFixed(2)
             ];
         });
 
@@ -290,6 +290,70 @@ async function generateStatementPDF(c) {
         throw err;
     }
 }
+function exportReport(format) {
+    try {
+        if (filteredData.length === 0) {
+            showToast("No data to download", "error");
+            return;
+        }
+
+        const headers = ['Customer Name', 'Mobile', 'Status', 'Total Overdue', 'Total Pending Balance'];
+        const data = filteredData.map(c => [
+            c.name,
+            c.mobile,
+            c.totalPendingBalance >= 0 ? 'UP' : 'DOWN',
+            c.totalOverdue.toFixed(2),
+            c.totalPendingBalance.toFixed(2)
+        ]);
+
+        const fileName = `UIC_Gold_Report_${new Date().toISOString().split('T')[0]}`;
+
+        if (format === 'pdf') {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('l', 'mm', 'a4');
+            doc.setFontSize(22);
+            doc.setFont(undefined, 'bold');
+            doc.text("UIC GOLD CUSTOMER REPORT", 148, 20, { align: "center" });
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'normal');
+            doc.text(`Generated on: ${new Date().toLocaleString()}`, 148, 28, { align: "center" });
+
+            doc.autoTable({
+                startY: 40,
+                head: [headers],
+                body: data,
+                headStyles: { fillColor: [16, 185, 129], textColor: [255, 255, 255] },
+                columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' } }
+            });
+            doc.save(`${fileName}.pdf`);
+        } else if (format === 'csv' || format === 'excel') {
+            // Use CSV with BOM for both CSV and Excel to ensure correct column parsing and no warnings
+            const csvContent = "\uFEFF" + [
+                headers.join(','),
+                ...data.map(row => row.map(val => `"${val}"`).join(','))
+            ].join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            downloadFile(blob, `${fileName}.csv`);
+        }
+
+        showToast(`Report exported as ${format.toUpperCase()}!`);
+    } catch (err) {
+        console.error(err);
+        showToast("Error exporting report", "error");
+    }
+}
+
+function downloadFile(blob, fileName) {
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", fileName);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
 
 function init() {
     fetchData();
@@ -418,7 +482,7 @@ function aggregateCustomerDataGviz(table) {
         if (c.totalPendingBalance >= 0) {
             c.totalOverdue = 0;
         } else {
-            c.totalOverdue = Math.min(Math.abs(c.totalPendingBalance), c.totalOverdue);
+            c.totalOverdue = -Math.min(Math.abs(c.totalPendingBalance), c.totalOverdue);
         }
     });
 
@@ -430,7 +494,7 @@ function updateStats() {
     const customersEl = document.getElementById('totalCustomers');
     const overdueEl = document.getElementById('totalOverdueAmount');
     if (customersEl) customersEl.textContent = customersData.length;
-    if (overdueEl) overdueEl.textContent = `Rs.${totalOverdue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    if (overdueEl) overdueEl.textContent = `${totalOverdue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
 }
 
 function renderTable() {
@@ -453,8 +517,8 @@ function renderTable() {
             <td><div class="customer-info"><span class="customer-name">${customer.name}</span></div></td>
             <td>${customer.mobile}</td>
             <td><div class="status-indicator ${statusClass}"><i data-lucide="${statusIcon}"></i></div></td>
-            <td class="amount overdue">Rs.${customer.totalOverdue.toFixed(2)}</td>
-            <td class="amount balance">Rs.${customer.totalPendingBalance.toFixed(2)}</td>
+            <td class="amount overdue">${customer.totalOverdue.toFixed(2)}</td>
+            <td class="amount balance">${customer.totalPendingBalance.toFixed(2)}</td>
             <td class="actions-col">
                 <button class="icon-btn" onclick="openStatement('${customer.key}')" title="View Unpaid Orders">
                     <i data-lucide="file-text"></i>
@@ -504,7 +568,7 @@ function openStatement(key) {
     currentStatementCustomer = customer;
     document.getElementById('stmtCustomerName').textContent = customer.name;
     document.getElementById('stmtCustomerMobile').textContent = customer.mobile;
-    document.getElementById('stmtCurrentBalance').textContent = `Rs.${customer.totalPendingBalance.toFixed(2)}`;
+    document.getElementById('stmtCurrentBalance').textContent = `${customer.totalPendingBalance.toFixed(2)}`;
     document.getElementById('stmtGeneratedAt').textContent = new Date().toLocaleString();
 
     const stmtTbody = document.getElementById('statementTableBody');
@@ -543,8 +607,8 @@ function renderStatementRow(tbody, t) {
         <td style="text-align: left !important; padding: 12px 16px !important; text-transform: capitalize;">${t.type} ${isPartial ? '<span class="badge badge-success" style="font-size: 0.6rem; padding: 2px 6px;">PARTIAL</span>' : ''}</td>
         <td style="text-align: left !important; padding: 12px 16px !important;" class="stmt-type-order">DEBIT</td>
         <td style="text-align: left !important; padding: 12px 16px !important;"><span class="status-badge ${statusClass}">${statusText}</span></td>
-        <td style="text-align: right !important; padding: 12px 16px !important;">Rs.${t.amount.toFixed(2)}</td>
-        <td style="text-align: right !important; padding: 12px 16px !important;" class="stmt-type-order">Rs.${t.outstandingAmount.toFixed(2)}</td>
+        <td style="text-align: right !important; padding: 12px 16px !important;">${t.amount.toFixed(2)}</td>
+        <td style="text-align: right !important; padding: 12px 16px !important;" class="stmt-type-order">${t.outstandingAmount.toFixed(2)}</td>
     `;
     tbody.appendChild(row);
 }

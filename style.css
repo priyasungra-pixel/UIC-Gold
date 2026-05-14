@@ -610,6 +610,18 @@ tbody td {
     background-color: var(--primary-dark);
 }
 
+.btn-secondary {
+    background-color: white;
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    box-shadow: var(--shadow-sm);
+}
+
+.btn-secondary:hover {
+    background-color: #f8fafc;
+    border-color: var(--text-muted);
+}
+
 .modal-body {
     padding: 32px;
     overflow-y: auto;
