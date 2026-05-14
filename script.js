@@ -92,10 +92,10 @@ function renderBatchTable() {
         const isOverdue = c.totalOverdue < 0;
         const status = isOverdue ? '<span class="status-badge status-overdue">OVERDUE</span>' : '<span class="status-badge status-open">OPEN</span>';
         
-        row.innerHTML = `
             <td style="text-align: center;"><input type="checkbox" class="batch-checkbox" data-key="${c.key}"></td>
             <td style="font-weight: 500;">${c.name}</td>
             <td>${c.mobile}</td>
+            <td class="text-right" style="font-weight: 600;">${c.totalOverdue.toFixed(2)}</td>
             <td class="text-right ${balanceClass}" style="font-weight: 600;">${c.totalPendingBalance.toFixed(2)}</td>
             <td style="text-align: center;">${status}</td>
         `;
@@ -573,6 +573,7 @@ function openStatement(key) {
     currentStatementCustomer = customer;
     document.getElementById('stmtCustomerName').textContent = customer.name;
     document.getElementById('stmtCustomerMobile').textContent = customer.mobile;
+    document.getElementById('stmtOverdueAmount').textContent = `${customer.totalOverdue.toFixed(2)}`;
     document.getElementById('stmtCurrentBalance').textContent = `${customer.totalPendingBalance.toFixed(2)}`;
     document.getElementById('stmtGeneratedAt').textContent = new Date().toLocaleString();
 

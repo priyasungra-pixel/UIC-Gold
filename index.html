@@ -155,6 +155,7 @@
                                 <th style="width: 40px; text-align: center;"><input type="checkbox" id="selectAllBatch" onclick="toggleAllBatch(this)"></th>
                                 <th class="sortable" onclick="handleBatchSort('name', this)">Customer Name <i data-lucide="arrow-up-down" id="sort-icon-name"></i></th>
                                 <th class="sortable" onclick="handleBatchSort('mobile', this)">Mobile <i data-lucide="arrow-up-down" id="sort-icon-mobile"></i></th>
+                                <th class="sortable text-right" onclick="handleBatchSort('totalOverdue', this)">Total Overdue <i data-lucide="arrow-up-down" id="sort-icon-totalOverdue"></i></th>
                                 <th class="sortable text-right" onclick="handleBatchSort('totalPendingBalance', this)">Total Balance <i data-lucide="arrow-up-down" id="sort-icon-totalPendingBalance"></i></th>
                                 <th style="width: 100px; text-align: center;">Status</th>
                             </tr>
@@ -274,6 +275,10 @@
                     <div class="summary-col">
                         <label>Mobile Number</label>
                         <p id="stmtCustomerMobile"></p>
+                    </div>
+                    <div class="summary-col">
+                        <label>Overdue Amount</label>
+                        <p id="stmtOverdueAmount" class="balance-text urgent"></p>
                     </div>
                     <div class="summary-col">
                         <label>Current Balance</label>
