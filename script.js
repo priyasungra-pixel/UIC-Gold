@@ -7,7 +7,7 @@ let sortConfig = { column: 'name', direction: 'asc' };
 let fetchTimeout;
 let currentStatementCustomer = null;
 
-const today = new Date('2026-05-06');
+const today = new Date();
 
 document.addEventListener('DOMContentLoaded', () => {
     init();
@@ -462,27 +462,32 @@ function aggregateCustomerDataGviz(table) {
         c.transactions.forEach(t => {
             if (t.isAdditive) runningBalance += t.amount;
             else runningBalance -= t.amount;
-
+            
             t.calculatedBalance = runningBalance;
 
-            if (t.date) {
-                if (t.date >= c.lastTransactionDate) {
-                    c.lastTransactionDate = t.date;
-                }
-                if (!t.isAdditive && t.type === 'order') {
-                    const diffDays = Math.floor((today - t.date) / (1000 * 60 * 60 * 24));
-                    if (diffDays > 30) c.totalOverdue += t.amount;
+            if (t.date && t.date >= c.lastTransactionDate) {
+                c.lastTransactionDate = t.date;
+            }
+        });
+
+        c.totalPendingBalance = runningBalance;
+        
+        // Correct Overdue Calculation using FIFO logic
+        const outstanding = getOutstandingTransactions(c);
+        let overdueSum = 0;
+        outstanding.forEach(t => {
+            if (t.type === 'order' && t.date) {
+                const diffDays = Math.floor((today - t.date) / (1000 * 60 * 60 * 24));
+                if (diffDays > 30) {
+                    overdueSum += t.outstandingAmount;
                 }
             }
         });
 
-        // Final balance is the running balance after ALL transactions
-        c.totalPendingBalance = runningBalance;
-
         if (c.totalPendingBalance >= 0) {
             c.totalOverdue = 0;
         } else {
-            c.totalOverdue = -Math.min(Math.abs(c.totalPendingBalance), c.totalOverdue);
+            c.totalOverdue = -Math.min(Math.abs(c.totalPendingBalance), overdueSum);
         }
     });
 
