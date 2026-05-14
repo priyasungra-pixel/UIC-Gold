@@ -92,6 +92,7 @@ function renderBatchTable() {
         const isOverdue = c.totalOverdue < 0;
         const status = isOverdue ? '<span class="status-badge status-overdue">OVERDUE</span>' : '<span class="status-badge status-open">OPEN</span>';
         
+        row.innerHTML = `
             <td style="text-align: center;"><input type="checkbox" class="batch-checkbox" data-key="${c.key}"></td>
             <td style="font-weight: 500;">${c.name}</td>
             <td>${c.mobile}</td>
