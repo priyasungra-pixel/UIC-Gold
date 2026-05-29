@@ -9,6 +9,14 @@ let currentStatementCustomer = null;
 
 const today = new Date();
 
+function formatDate(date) {
+    if (!date) return 'N/A';
+    const d = String(date.getDate()).padStart(2, '0');
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const y = date.getFullYear();
+    return `${d}-${m}-${y}`;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     init();
     setupSearch();
@@ -260,8 +268,8 @@ async function generateStatementPDF(c) {
             const dueDate = t.date ? new Date(t.date) : null;
             if (dueDate) dueDate.setDate(dueDate.getDate() + 30);
             return [
-                t.date ? t.date.toLocaleDateString() : 'N/A',
-                dueDate ? dueDate.toLocaleDateString() : 'N/A',
+                formatDate(t.date),
+                formatDate(dueDate),
                 t.type.toUpperCase() + (t.outstandingAmount < t.amount ? ' (PARTIAL)' : ''),
                 'DEBIT',
                 diffDays > 30 ? 'OVERDUE' : 'OPEN',
@@ -622,8 +630,8 @@ function renderStatementRow(tbody, t) {
     if (dueDate) dueDate.setDate(dueDate.getDate() + 30);
 
     row.innerHTML = `
-        <td style="text-align: left !important; padding: 12px 16px !important;">${t.date ? t.date.toLocaleDateString() : 'N/A'}</td>
-        <td style="text-align: left !important; padding: 12px 16px !important;">${dueDate ? dueDate.toLocaleDateString() : 'N/A'}</td>
+        <td style="text-align: left !important; padding: 12px 16px !important;">${formatDate(t.date)}</td>
+        <td style="text-align: left !important; padding: 12px 16px !important;">${formatDate(dueDate)}</td>
         <td style="text-align: left !important; padding: 12px 16px !important; text-transform: capitalize;">${t.type} ${isPartial ? '<span class="badge badge-success" style="font-size: 0.6rem; padding: 2px 6px;">PARTIAL</span>' : ''}</td>
         <td style="text-align: left !important; padding: 12px 16px !important;" class="stmt-type-order">DEBIT</td>
         <td style="text-align: left !important; padding: 12px 16px !important;"><span class="status-badge ${statusClass}">${statusText}</span></td>
