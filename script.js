@@ -235,11 +235,24 @@ async function generateStatementPDF(c) {
         doc.setFont(undefined, 'normal');
         doc.text(`Name: ${c.name}`, 20, 87);
         doc.text(`Mobile: ${c.mobile}`, 20, 93);
-        doc.text(`Net Account Balance: ${c.totalPendingBalance.toFixed(2)}`, 20, 99);
         
         doc.setFontSize(8);
         doc.setTextColor(150);
         doc.text(`Generated on: ${new Date().toLocaleString()}`, 190, 80, { align: "right" });
+        
+        doc.setFontSize(10);
+        doc.setTextColor(0);
+        doc.setFont(undefined, 'normal');
+        doc.text(`Total Overdue: `, 160, 87, { align: "right" });
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(153, 27, 27); // red color for overdue
+        doc.text(`${c.totalOverdue.toFixed(2)}`, 190, 87, { align: "right" });
+        
+        doc.setFont(undefined, 'normal');
+        doc.setTextColor(0);
+        doc.text(`Total Pending Balance: `, 160, 93, { align: "right" });
+        doc.setFont(undefined, 'bold');
+        doc.text(`${c.totalPendingBalance.toFixed(2)}`, 190, 93, { align: "right" });
 
         const displayList = getOutstandingTransactions(c);
         const tableData = displayList.map(t => {
