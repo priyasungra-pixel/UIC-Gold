@@ -4,6 +4,7 @@ const GID = '0';
 let customersData = [];
 let filteredData = [];
 let sortConfig = { column: 'name', direction: 'asc' };
+let pendingSortConfig = { column: 'date', direction: 'asc' };
 let fetchTimeout;
 let currentStatementCustomer = null;
 
@@ -31,7 +32,7 @@ function setupNavigation() {
 
 function switchView(viewId) {
     // Hide all views
-    const views = ['gold-customer', 'statements', 'reports', 'settings'];
+    const views = ['gold-customer', 'pending-invoices', 'statements', 'reports', 'settings'];
     views.forEach(v => {
         const viewEl = document.getElementById(`view-${v}`);
         const navEl = document.getElementById(`nav-${v}`);
@@ -59,6 +60,10 @@ function switchView(viewId) {
             searchInput.placeholder = "Search disabled in this view";
             searchInput.disabled = true;
         }
+    }
+
+    if (viewId === 'pending-invoices') {
+        renderPendingInvoicesTable();
     }
 
     lucide.createIcons();
@@ -156,6 +161,32 @@ function updateSortIcons() {
         }
     });
 
+    lucide.createIcons();
+}
+
+function handlePendingSort(column) {
+    pendingSortConfig.direction = (pendingSortConfig.column === column && pendingSortConfig.direction === 'asc') ? 'desc' : 'asc';
+    pendingSortConfig.column = column;
+    
+    renderPendingInvoicesTable();
+    updatePendingSortIcons();
+}
+
+function updatePendingSortIcons() {
+    const { column, direction } = pendingSortConfig;
+    const icons = document.querySelectorAll('#view-pending-invoices .sortable i');
+    icons.forEach(i => {
+        i.setAttribute('data-lucide', 'arrow-up-down');
+        i.style.color = 'inherit';
+        i.style.opacity = '0.5';
+    });
+
+    const iconEl = document.getElementById(`sort-icon-${column}-pending`);
+    if (iconEl) {
+        iconEl.setAttribute('data-lucide', direction === 'asc' ? 'chevron-up' : 'chevron-down');
+        iconEl.style.color = 'var(--primary-color)';
+        iconEl.style.opacity = '1';
+    }
     lucide.createIcons();
 }
 
@@ -421,6 +452,7 @@ window.handleResponse = function (response) {
         sortData();
         updateStats();
         renderTable();
+        renderPendingInvoicesTable();
         hideLoader();
         showToast("Data synced!");
     } catch (err) {
@@ -473,7 +505,9 @@ function aggregateCustomerDataGviz(table) {
         }
 
         const isAdditive = additiveTypes.includes(type);
-        customers[key].transactions.push({ type, date, amount, isAdditive });
+        // Capture Order ID from column 10
+        const orderId = cells[10] && cells[10].v ? String(cells[10].v) : '-';
+        customers[key].transactions.push({ type, date, amount, isAdditive, orderId });
     });
 
     Object.values(customers).forEach(c => {
@@ -748,4 +782,120 @@ function showToast(message, type = 'success') {
         toast.style.opacity = '0';
         setTimeout(() => toast.remove(), 500);
     }, 4000);
+}
+
+function renderPendingInvoicesTable() {
+    const tbody = document.getElementById('pendingInvoicesTableBody');
+    if (!tbody) return;
+
+    let pendingTransactions = [];
+
+    customersData.forEach(customer => {
+        const outstanding = getOutstandingTransactions(customer);
+        outstanding.forEach(t => {
+            if (t.type === 'order' || t.outstandingAmount > 0) {
+                pendingTransactions.push({
+                    customer: customer,
+                    transaction: t
+                });
+            }
+        });
+    });
+
+    // Dynamic sorting based on pendingSortConfig
+    const factor = pendingSortConfig.direction === 'asc' ? 1 : -1;
+    pendingTransactions.sort((a, b) => {
+        let valA, valB;
+        switch (pendingSortConfig.column) {
+            case 'date':
+                valA = a.transaction.date ? a.transaction.date.getTime() : 0;
+                valB = b.transaction.date ? b.transaction.date.getTime() : 0;
+                break;
+            case 'dueDate':
+                const da = a.transaction.date ? new Date(a.transaction.date) : new Date(0);
+                if (a.transaction.date) da.setDate(da.getDate() + 30);
+                const db = b.transaction.date ? new Date(b.transaction.date) : new Date(0);
+                if (b.transaction.date) db.setDate(db.getDate() + 30);
+                valA = da.getTime();
+                valB = db.getTime();
+                break;
+            case 'status':
+                const diffA = a.transaction.date ? Math.floor((today - a.transaction.date) / (1000 * 60 * 60 * 24)) : 0;
+                const diffB = b.transaction.date ? Math.floor((today - b.transaction.date) / (1000 * 60 * 60 * 24)) : 0;
+                valA = diffA > 30 ? 1 : 0;
+                valB = diffB > 30 ? 1 : 0;
+                break;
+            case 'orderId':
+                valA = a.transaction.orderId || '';
+                valB = b.transaction.orderId || '';
+                break;
+            case 'name':
+                valA = a.customer.name;
+                valB = b.customer.name;
+                break;
+            case 'mobile':
+                valA = a.customer.mobile;
+                valB = b.customer.mobile;
+                break;
+            case 'amount':
+                valA = a.transaction.amount;
+                valB = b.transaction.amount;
+                break;
+            case 'balance':
+                valA = -a.transaction.outstandingAmount;
+                valB = -b.transaction.outstandingAmount;
+                break;
+            default:
+                valA = 0; valB = 0;
+        }
+
+        if (typeof valA === 'string' && typeof valB === 'string') {
+            return valA.localeCompare(valB) * factor;
+        }
+        return (valA - valB) * factor;
+    });
+
+    if (pendingTransactions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px;">No pending invoices found.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = '';
+    pendingTransactions.forEach(item => {
+        const c = item.customer;
+        const t = item.transaction;
+
+        const date = t.date ? new Date(t.date) : null;
+        let diffDays = 0;
+        let dueDate = null;
+        let dateStr = 'N/A';
+        let timeStr = '';
+        
+        if (date) {
+            diffDays = Math.floor((today - date) / (1000 * 60 * 60 * 24));
+            dueDate = new Date(date);
+            dueDate.setDate(dueDate.getDate() + 30);
+            dateStr = formatDate(date);
+            timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+        
+        const isOverdue = diffDays > 30;
+        const statusText = isOverdue ? 'Overdue' : 'Not Yet Due';
+        const dueDateStr = formatDate(dueDate);
+        const orderId = t.orderId || '-';
+        
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${statusText}</td>
+            <td style="white-space: nowrap;">${dateStr}</td>
+            <td style="white-space: nowrap;">${dueDateStr}</td>
+            <td>${orderId}</td>
+            <td>${c.name}</td>
+            <td>${c.mobile}</td>
+            <td style="white-space: nowrap;">Rs.${t.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+            <td style="white-space: nowrap;">Rs.${(-t.outstandingAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+            <td></td>
+        `;
+        tbody.appendChild(row);
+    });
 }

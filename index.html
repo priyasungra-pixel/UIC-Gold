@@ -29,6 +29,10 @@
                     <i data-lucide="users"></i>
                     <span>Gold Customer</span>
                 </a>
+                <a href="#" class="nav-item" id="nav-pending-invoices" onclick="switchView('pending-invoices')">
+                    <i data-lucide="file-clock"></i>
+                    <span>Pending Invoice</span>
+                </a>
                 <a href="#" class="nav-item" id="nav-statements" onclick="switchView('statements')">
                     <i data-lucide="file-text"></i>
                     <span>Statements</span>
@@ -124,6 +128,39 @@
                                         <span>Fetching data from Google Sheets...</span>
                                     </div>
                                 </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Pending Invoices View -->
+            <section class="content-body" id="view-pending-invoices" style="display: none;">
+                <div class="content-header">
+                    <div class="title-group">
+                        <h1>Pending Invoices</h1>
+                        <p class="subtitle">Detailed view of all pending invoices</p>
+                    </div>
+                </div>
+                
+                <div class="table-container card">
+                    <table class="batch-table">
+                        <thead>
+                            <tr>
+                                <th class="sortable" onclick="handlePendingSort('status', this)">Status <i data-lucide="arrow-up-down" id="sort-icon-status-pending"></i></th>
+                                <th class="sortable" onclick="handlePendingSort('date', this)">Date <i data-lucide="arrow-up-down" id="sort-icon-date-pending"></i></th>
+                                <th class="sortable" onclick="handlePendingSort('dueDate', this)">Overdue Date <i data-lucide="arrow-up-down" id="sort-icon-dueDate-pending"></i></th>
+                                <th class="sortable" onclick="handlePendingSort('orderId', this)">Order Id <i data-lucide="arrow-up-down" id="sort-icon-orderId-pending"></i></th>
+                                <th class="sortable" onclick="handlePendingSort('name', this)">Customer Name <i data-lucide="arrow-up-down" id="sort-icon-name-pending"></i></th>
+                                <th class="sortable" onclick="handlePendingSort('mobile', this)">Mobile Number <i data-lucide="arrow-up-down" id="sort-icon-mobile-pending"></i></th>
+                                <th class="sortable text-right" onclick="handlePendingSort('amount', this)">Transaction Amount <i data-lucide="arrow-up-down" id="sort-icon-amount-pending"></i></th>
+                                <th class="sortable text-right" onclick="handlePendingSort('balance', this)">Balance <i data-lucide="arrow-up-down" id="sort-icon-balance-pending"></i></th>
+                                <th>Interest Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pendingInvoicesTableBody">
+                            <tr>
+                                <td colspan="9" style="text-align: center; padding: 20px;">No pending invoices found.</td>
                             </tr>
                         </tbody>
                     </table>
