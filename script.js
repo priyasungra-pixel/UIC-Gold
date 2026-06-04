@@ -295,7 +295,12 @@ async function generateStatementPDF(c) {
 
         const displayList = getOutstandingTransactions(c);
         const tableData = displayList.map(t => {
-            const diffDays = t.date ? Math.floor((today - t.date) / (1000 * 60 * 60 * 24)) : 0;
+            let diffDays = 0;
+            if (t.date) {
+                const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                const dateStart = new Date(t.date.getFullYear(), t.date.getMonth(), t.date.getDate());
+                diffDays = Math.round((todayStart - dateStart) / (1000 * 60 * 60 * 24));
+            }
             const dueDate = t.date ? new Date(t.date) : null;
             if (dueDate) dueDate.setDate(dueDate.getDate() + 30);
             return [
@@ -533,7 +538,9 @@ function aggregateCustomerDataGviz(table) {
         let overdueSum = 0;
         outstanding.forEach(t => {
             if (t.type === 'order' && t.date) {
-                const diffDays = Math.floor((today - t.date) / (1000 * 60 * 60 * 24));
+                const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                const dateStart = new Date(t.date.getFullYear(), t.date.getMonth(), t.date.getDate());
+                const diffDays = Math.round((todayStart - dateStart) / (1000 * 60 * 60 * 24));
                 if (diffDays > 30) {
                     overdueSum += t.outstandingAmount;
                 }
@@ -655,7 +662,12 @@ function openStatement(key) {
 function renderStatementRow(tbody, t) {
     const row = document.createElement('tr');
     const isPartial = t.outstandingAmount < t.amount;
-    const diffDays = t.date ? Math.floor((today - t.date) / (1000 * 60 * 60 * 24)) : 0;
+    let diffDays = 0;
+    if (t.date) {
+        const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const dateStart = new Date(t.date.getFullYear(), t.date.getMonth(), t.date.getDate());
+        diffDays = Math.round((todayStart - dateStart) / (1000 * 60 * 60 * 24));
+    }
     const isOverdue = diffDays > 30;
     const statusText = isOverdue ? 'OVERDUE' : 'OPEN';
     const statusClass = isOverdue ? 'status-overdue' : 'status-open';
@@ -820,8 +832,18 @@ function renderPendingInvoicesTable() {
                 valB = db.getTime();
                 break;
             case 'status':
-                const diffA = a.transaction.date ? Math.floor((today - a.transaction.date) / (1000 * 60 * 60 * 24)) : 0;
-                const diffB = b.transaction.date ? Math.floor((today - b.transaction.date) / (1000 * 60 * 60 * 24)) : 0;
+                let diffA = 0;
+                let diffB = 0;
+                if (a.transaction.date) {
+                    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                    const dateStart = new Date(a.transaction.date.getFullYear(), a.transaction.date.getMonth(), a.transaction.date.getDate());
+                    diffA = Math.round((todayStart - dateStart) / (1000 * 60 * 60 * 24));
+                }
+                if (b.transaction.date) {
+                    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                    const dateStart = new Date(b.transaction.date.getFullYear(), b.transaction.date.getMonth(), b.transaction.date.getDate());
+                    diffB = Math.round((todayStart - dateStart) / (1000 * 60 * 60 * 24));
+                }
                 valA = diffA > 30 ? 1 : 0;
                 valB = diffB > 30 ? 1 : 0;
                 break;
@@ -872,7 +894,9 @@ function renderPendingInvoicesTable() {
         let timeStr = '';
         
         if (date) {
-            diffDays = Math.floor((today - date) / (1000 * 60 * 60 * 24));
+            const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+            diffDays = Math.round((todayStart - dateStart) / (1000 * 60 * 60 * 24));
             dueDate = new Date(date);
             dueDate.setDate(dueDate.getDate() + 30);
             dateStr = formatDate(date);
