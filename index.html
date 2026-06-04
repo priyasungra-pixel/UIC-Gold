@@ -102,6 +102,10 @@
                                 <span class="stat-label">Total Overdue</span>
                                 <span class="stat-value" id="totalOverdueAmount">-</span>
                             </div>
+                            <div class="stat-card" style="color: var(--primary-color);">
+                                <span class="stat-label">Total Pending Balance</span>
+                                <span class="stat-value" id="totalPendingBalanceAmount">-</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -174,7 +178,7 @@
                         <p class="subtitle">Select multiple customers to generate statements in bulk</p>
                     </div>
                     <div class="action-group" style="display: flex; gap: 12px; align-items: center;">
-                        <select id="batchStatusFilter" class="btn" style="background: white; border: 1px solid var(--border-color); color: var(--text-main); font-weight: 500;" onchange="renderBatchTable()">
+                        <select id="batchStatusFilter" class="btn" style="background: var(--sidebar-bg); border: 1px solid var(--border-color); color: var(--text-main); font-weight: 500;" onchange="renderBatchTable()">
                             <option value="all">All Status</option>
                             <option value="overdue">Overdue Only</option>
                             <option value="open">Open Only</option>

@@ -559,10 +559,13 @@ function aggregateCustomerDataGviz(table) {
 
 function updateStats() {
     const totalOverdue = customersData.reduce((sum, c) => sum + c.totalOverdue, 0);
+    const totalPendingBalance = customersData.reduce((sum, c) => sum + c.totalPendingBalance, 0);
     const customersEl = document.getElementById('totalCustomers');
     const overdueEl = document.getElementById('totalOverdueAmount');
+    const pendingBalanceEl = document.getElementById('totalPendingBalanceAmount');
     if (customersEl) customersEl.textContent = customersData.length;
     if (overdueEl) overdueEl.textContent = `${totalOverdue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    if (pendingBalanceEl) pendingBalanceEl.textContent = `${totalPendingBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
 }
 
 function renderTable() {
