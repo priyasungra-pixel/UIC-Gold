@@ -307,6 +307,7 @@ async function generateStatementPDF(c) {
                 formatDate(t.date),
                 formatDate(dueDate),
                 t.type.toUpperCase() + (t.outstandingAmount < t.amount ? ' (PARTIAL)' : ''),
+                t.orderId || '-',
                 'DEBIT',
                 diffDays > 30 ? 'OVERDUE' : 'OPEN',
                 t.amount.toFixed(2),
@@ -316,18 +317,18 @@ async function generateStatementPDF(c) {
 
         doc.autoTable({
             startY: 110,
-            head: [['Date', 'Due Date', 'Description', 'Type', 'Status', 'Original', 'Outstanding']],
+            head: [['Date', 'Due Date', 'Description', 'Order Id', 'Type', 'Status', 'Original', 'Outstanding']],
             body: tableData,
             headStyles: { fillColor: [241, 245, 249], textColor: [71, 85, 105], fontStyle: 'bold' },
             alternateRowStyles: { fillColor: [248, 250, 252] },
             columnStyles: {
-                4: { fontStyle: 'bold' },
-                5: { halign: 'left' },
-                6: { halign: 'left', fontStyle: 'bold', textColor: [239, 68, 68] }
+                5: { fontStyle: 'bold' },
+                6: { halign: 'left' },
+                7: { halign: 'left', fontStyle: 'bold', textColor: [239, 68, 68] }
             },
             styles: { fontSize: 8 },
             didParseCell: function (data) {
-                if (data.section === 'body' && data.column.index === 4) {
+                if (data.section === 'body' && data.column.index === 5) {
                     if (data.cell.raw === 'OVERDUE') data.cell.styles.textColor = [153, 27, 27];
                 }
             }
@@ -682,6 +683,7 @@ function renderStatementRow(tbody, t) {
         <td style="text-align: left !important; padding: 12px 16px !important;">${formatDate(t.date)}</td>
         <td style="text-align: left !important; padding: 12px 16px !important;">${formatDate(dueDate)}</td>
         <td style="text-align: left !important; padding: 12px 16px !important; text-transform: capitalize;">${t.type} ${isPartial ? '<span class="badge badge-success" style="font-size: 0.6rem; padding: 2px 6px;">PARTIAL</span>' : ''}</td>
+        <td style="text-align: left !important; padding: 12px 16px !important;">${t.orderId || '-'}</td>
         <td style="text-align: left !important; padding: 12px 16px !important;" class="stmt-type-order">DEBIT</td>
         <td style="text-align: left !important; padding: 12px 16px !important;"><span class="status-badge ${statusClass}">${statusText}</span></td>
         <td style="text-align: right !important; padding: 12px 16px !important;">${t.amount.toFixed(2)}</td>
