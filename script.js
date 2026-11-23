@@ -425,10 +425,6 @@ function exportReport(format) {
         showToast("Error exporting report", "error");
     }
 }
-        console.error(err);
-        showToast("Error exporting report", "error");
-    }
-}
 
 function downloadFile(blob, fileName) {
     const link = document.createElement("a");
