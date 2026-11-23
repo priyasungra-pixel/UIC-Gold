@@ -3,6 +3,7 @@ const GID = '0';
 
 let customersData = [];
 let filteredData = [];
+let currentCategoryFilter = 'all';
 let sortConfig = { column: 'name', direction: 'asc' };
 let pendingSortConfig = { column: 'date', direction: 'asc' };
 let fetchTimeout;
@@ -293,6 +294,12 @@ async function generateStatementPDF(c) {
         doc.setFont(undefined, 'bold');
         doc.text(`${c.totalPendingBalance.toFixed(2)}`, 190, 93, { align: "right" });
 
+        // Overdue Category Breakdown in PDF
+        doc.setFontSize(8);
+        doc.setFont(undefined, 'normal');
+        doc.setTextColor(100);
+        doc.text(`Categories: 1-30d: ${(c.overdue1_30 || 0).toFixed(2)} | 31-60d: ${(c.overdue31_60 || 0).toFixed(2)} | 61-90d: ${(c.overdue61_90 || 0).toFixed(2)} | 90+d: ${(c.overdue90Plus || 0).toFixed(2)}`, 190, 99, { align: "right" });
+
         const displayList = getOutstandingTransactions(c);
         const tableData = displayList.map(t => {
             let diffDays = 0;
@@ -303,13 +310,23 @@ async function generateStatementPDF(c) {
             }
             const dueDate = t.date ? new Date(t.date) : null;
             if (dueDate) dueDate.setDate(dueDate.getDate() + 30);
+
+            let statusText = 'OPEN';
+            if (diffDays > 30) {
+                const overdueDays = diffDays - 30;
+                if (overdueDays <= 30) statusText = 'OVERDUE (1–30d)';
+                else if (overdueDays <= 60) statusText = 'OVERDUE (31–60d)';
+                else if (overdueDays <= 90) statusText = 'OVERDUE (61–90d)';
+                else statusText = 'OVERDUE (90+d)';
+            }
+
             return [
                 formatDate(t.date),
                 formatDate(dueDate),
                 t.type.toUpperCase() + (t.outstandingAmount < t.amount ? ' (PARTIAL)' : ''),
                 t.orderId || '-',
                 'DEBIT',
-                diffDays > 30 ? 'OVERDUE' : 'OPEN',
+                statusText,
                 t.amount.toFixed(2),
                 t.outstandingAmount.toFixed(2)
             ];
@@ -329,7 +346,9 @@ async function generateStatementPDF(c) {
             styles: { fontSize: 8 },
             didParseCell: function (data) {
                 if (data.section === 'body' && data.column.index === 5) {
-                    if (data.cell.raw === 'OVERDUE') data.cell.styles.textColor = [153, 27, 27];
+                    if (typeof data.cell.raw === 'string' && data.cell.raw.startsWith('OVERDUE')) {
+                        data.cell.styles.textColor = [153, 27, 27];
+                    }
                 }
             }
         });
@@ -356,33 +375,38 @@ function exportReport(format) {
             return;
         }
 
-        const headers = ['Customer Name', 'Mobile', 'Status', 'Total Overdue', 'Total Pending Balance'];
+        const headers = ['Customer Name', 'Mobile', 'Category', 'Status', 'Total Overdue', 'Total Pending Balance'];
         const data = filteredData.map(c => [
             c.name,
             c.mobile,
+            c.category || 'UIC Gold',
             c.totalPendingBalance >= 0 ? 'UP' : 'DOWN',
             c.totalOverdue.toFixed(2),
             c.totalPendingBalance.toFixed(2)
         ]);
 
-        const fileName = `UIC_Gold_Report_${new Date().toISOString().split('T')[0]}`;
+        const fileName = `UIC_Gold_Overdue_Report_${new Date().toISOString().split('T')[0]}`;
 
         if (format === 'pdf') {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF('l', 'mm', 'a4');
-            doc.setFontSize(22);
+            doc.setFontSize(20);
             doc.setFont(undefined, 'bold');
-            doc.text("UIC GOLD CUSTOMER REPORT", 148, 20, { align: "center" });
-            doc.setFontSize(10);
+            doc.text("UIC GOLD & B2B CUSTOMER OVERDUE REPORT", 148, 18, { align: "center" });
+            doc.setFontSize(9);
             doc.setFont(undefined, 'normal');
-            doc.text(`Generated on: ${new Date().toLocaleString()}`, 148, 28, { align: "center" });
+            doc.text(`Generated on: ${new Date().toLocaleString()}`, 148, 25, { align: "center" });
 
             doc.autoTable({
-                startY: 40,
+                startY: 32,
                 head: [headers],
                 body: data,
-                headStyles: { fillColor: [16, 185, 129], textColor: [255, 255, 255] },
-                columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' } }
+                headStyles: { fillColor: [16, 185, 129], textColor: [255, 255, 255], fontStyle: 'bold' },
+                columnStyles: {
+                    4: { halign: 'right', fontStyle: 'bold' },
+                    5: { halign: 'right' }
+                },
+                styles: { fontSize: 8 }
             });
             doc.save(`${fileName}.pdf`);
         } else if (format === 'csv' || format === 'excel') {
@@ -397,6 +421,10 @@ function exportReport(format) {
 
         showToast(`Report exported as ${format.toUpperCase()}!`);
     } catch (err) {
+        console.error(err);
+        showToast("Error exporting report", "error");
+    }
+}
         console.error(err);
         showToast("Error exporting report", "error");
     }
@@ -454,10 +482,8 @@ window.handleResponse = function (response) {
     try {
         const table = response.table;
         customersData = aggregateCustomerDataGviz(table);
-        filteredData = [...customersData];
-        sortData();
         updateStats();
-        renderTable();
+        applyFilters();
         renderPendingInvoicesTable();
         hideLoader();
         showToast("Data synced!");
@@ -480,9 +506,20 @@ function parseGvizDate(dateVal) {
     return isNaN(d.getTime()) ? null : d;
 }
 
+const B2B_KEYWORDS = ['trader', 'treder', 'enterprise', 'company', 'agency', 'agenci', 'corporation', 'sewa', 'seva', 'ksk', 'kendra', 'culture', 'm /s'];
+
+function getCustomerCategory(name, address = '') {
+    const lowerName = (name || '').toLowerCase();
+    const lowerAddr = (address || '').toLowerCase();
+    const isB2B = B2B_KEYWORDS.some(k => lowerName.includes(k)) ||
+                  lowerAddr.includes('gst') ||
+                  lowerAddr.includes('pan');
+    return isB2B ? 'B2B' : 'UIC Gold';
+}
+
 function aggregateCustomerDataGviz(table) {
     const customers = {};
-    const COL = { TYPE: 0, DATE: 1, NAME: 2, MOBILE: 3, AMOUNT: 11, BALANCE: 12 };
+    const COL = { TYPE: 0, DATE: 1, NAME: 2, MOBILE: 3, ADDRESS: 4, AMOUNT: 11, BALANCE: 12 };
     const additiveTypes = ['offer', 'recharged via cms', 'refund', 'paid', 'u2ureward', 'recharged online', 'cashback', 'recharged via direct', 'referral bounus', 'recharged via online'];
 
     table.rows.forEach(row => {
@@ -494,6 +531,7 @@ function aggregateCustomerDataGviz(table) {
         let mobile = cells[COL.MOBILE] ? (cells[COL.MOBILE].f || String(cells[COL.MOBILE].v)) : 'N/A';
         // Clean mobile number to ensure consistent grouping
         mobile = mobile.replace(/[\s\-\(\)]/g, '');
+        const address = cells[COL.ADDRESS] && cells[COL.ADDRESS].v ? String(cells[COL.ADDRESS].v) : '';
         const date = cells[COL.DATE] ? parseGvizDate(cells[COL.DATE].v) : null;
         const amount = cells[COL.AMOUNT] ? parseFloat(cells[COL.AMOUNT].v) || 0 : 0;
 
@@ -503,8 +541,14 @@ function aggregateCustomerDataGviz(table) {
                 key: key,
                 name: name,
                 mobile: mobile,
+                address: address,
+                category: getCustomerCategory(name, address),
                 totalPendingBalance: 0,
                 totalOverdue: 0,
+                overdue1_30: 0,
+                overdue31_60: 0,
+                overdue61_90: 0,
+                overdue90Plus: 0,
                 lastTransactionDate: new Date(0),
                 transactions: []
             };
@@ -534,24 +578,57 @@ function aggregateCustomerDataGviz(table) {
 
         c.totalPendingBalance = runningBalance;
         
-        // Correct Overdue Calculation using FIFO logic
+        // Correct Overdue Calculation using FIFO logic & Aging Categories
         const outstanding = getOutstandingTransactions(c);
+        let overdue1_30 = 0;
+        let overdue31_60 = 0;
+        let overdue61_90 = 0;
+        let overdue90Plus = 0;
         let overdueSum = 0;
+
         outstanding.forEach(t => {
             if (t.type === 'order' && t.date) {
                 const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
                 const dateStart = new Date(t.date.getFullYear(), t.date.getMonth(), t.date.getDate());
                 const diffDays = Math.round((todayStart - dateStart) / (1000 * 60 * 60 * 24));
                 if (diffDays > 30) {
+                    const overdueDays = diffDays - 30;
                     overdueSum += t.outstandingAmount;
+                    if (overdueDays <= 30) {
+                        overdue1_30 += t.outstandingAmount;
+                    } else if (overdueDays <= 60) {
+                        overdue31_60 += t.outstandingAmount;
+                    } else if (overdueDays <= 90) {
+                        overdue61_90 += t.outstandingAmount;
+                    } else {
+                        overdue90Plus += t.outstandingAmount;
+                    }
                 }
             }
         });
 
         if (c.totalPendingBalance >= 0) {
             c.totalOverdue = 0;
+            c.overdue1_30 = 0;
+            c.overdue31_60 = 0;
+            c.overdue61_90 = 0;
+            c.overdue90Plus = 0;
         } else {
-            c.totalOverdue = -Math.min(Math.abs(c.totalPendingBalance), overdueSum);
+            const cappedOverdue = Math.min(Math.abs(c.totalPendingBalance), overdueSum);
+            c.totalOverdue = -cappedOverdue;
+
+            if (overdueSum > 0 && cappedOverdue < overdueSum) {
+                const ratio = cappedOverdue / overdueSum;
+                c.overdue1_30 = -(overdue1_30 * ratio);
+                c.overdue31_60 = -(overdue31_60 * ratio);
+                c.overdue61_90 = -(overdue61_90 * ratio);
+                c.overdue90Plus = -(overdue90Plus * ratio);
+            } else {
+                c.overdue1_30 = -overdue1_30;
+                c.overdue31_60 = -overdue31_60;
+                c.overdue61_90 = -overdue61_90;
+                c.overdue90Plus = -overdue90Plus;
+            }
         }
     });
 
@@ -559,14 +636,127 @@ function aggregateCustomerDataGviz(table) {
 }
 
 function updateStats() {
+    const totalCustomers = customersData.length;
     const totalOverdue = customersData.reduce((sum, c) => sum + c.totalOverdue, 0);
     const totalPendingBalance = customersData.reduce((sum, c) => sum + c.totalPendingBalance, 0);
+
+    const goldCustomers = customersData.filter(c => c.category === 'UIC Gold');
+    const b2bCustomers = customersData.filter(c => c.category === 'B2B');
+
+    const goldOverdue = goldCustomers.reduce((sum, c) => sum + c.totalOverdue, 0);
+    const b2bOverdue = b2bCustomers.reduce((sum, c) => sum + c.totalOverdue, 0);
+
+    const goldPending = goldCustomers.reduce((sum, c) => sum + c.totalPendingBalance, 0);
+    const b2bPending = b2bCustomers.reduce((sum, c) => sum + c.totalPendingBalance, 0);
+
+    const overdueCount = customersData.filter(c => c.totalOverdue < -0.005).length;
+    const clearCount = customersData.filter(c => Math.abs(c.totalOverdue) < 0.005).length;
+
+    // Update Top Stat Elements
     const customersEl = document.getElementById('totalCustomers');
     const overdueEl = document.getElementById('totalOverdueAmount');
     const pendingBalanceEl = document.getElementById('totalPendingBalanceAmount');
-    if (customersEl) customersEl.textContent = customersData.length;
+    const goldOverdueEl = document.getElementById('goldOverdueAmount');
+    const b2bOverdueEl = document.getElementById('b2bOverdueAmount');
+
+    if (customersEl) customersEl.textContent = totalCustomers;
     if (overdueEl) overdueEl.textContent = `${totalOverdue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
     if (pendingBalanceEl) pendingBalanceEl.textContent = `${totalPendingBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    if (goldOverdueEl) goldOverdueEl.textContent = `${goldOverdue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    if (b2bOverdueEl) b2bOverdueEl.textContent = `${b2bOverdue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+
+    // Update sublabels / counts
+    const ratioEl = document.getElementById('custCategoryRatio');
+    const goldCountEl = document.getElementById('goldCustomerCount');
+    const b2bCountEl = document.getElementById('b2bCustomerCount');
+    if (ratioEl) ratioEl.innerHTML = `${goldCustomers.length} Gold &bull; ${b2bCustomers.length} B2B`;
+    if (goldCountEl) goldCountEl.textContent = `${goldCustomers.length} Customers`;
+    if (b2bCountEl) b2bCountEl.textContent = `${b2bCustomers.length} Customers`;
+
+    // Update Category Overview Cards
+    const cardGoldAmt = document.getElementById('catCardGoldOverdue');
+    const cardB2BAmt = document.getElementById('catCardB2BOverdue');
+    const cardGoldBal = document.getElementById('catCardGoldBalance');
+    const cardB2BBal = document.getElementById('catCardB2BBalance');
+    const cardGoldCnt = document.getElementById('cardGoldCount');
+    const cardB2BCnt = document.getElementById('cardB2BCount');
+
+    if (cardGoldAmt) cardGoldAmt.textContent = `${goldOverdue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    if (cardB2BAmt) cardB2BAmt.textContent = `${b2bOverdue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    if (cardGoldBal) cardGoldBal.textContent = `Balance: ${goldPending.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    if (cardB2BBal) cardB2BBal.textContent = `Balance: ${b2bPending.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    if (cardGoldCnt) cardGoldCnt.textContent = `${goldCustomers.length} Accounts`;
+    if (cardB2BCnt) cardB2BCnt.textContent = `${b2bCustomers.length} Accounts`;
+
+    // Update Filter Pill Counts
+    const pillAll = document.getElementById('pillCountAll');
+    const pillGold = document.getElementById('pillCountGold');
+    const pillB2B = document.getElementById('pillCountB2B');
+    const pillOverdue = document.getElementById('pillCountOverdue');
+    const pillClear = document.getElementById('pillCountClear');
+
+    if (pillAll) pillAll.textContent = totalCustomers;
+    if (pillGold) pillGold.textContent = goldCustomers.length;
+    if (pillB2B) pillB2B.textContent = b2bCustomers.length;
+    if (pillOverdue) pillOverdue.textContent = overdueCount;
+    if (pillClear) pillClear.textContent = clearCount;
+}
+
+function filterByCustomerCategory(category) {
+    currentCategoryFilter = category;
+
+    // Update active stat cards
+    document.querySelectorAll('.clickable-stat').forEach(card => {
+        if (card.getAttribute('data-cust-filter') === category) {
+            card.classList.add('active');
+        } else {
+            card.classList.remove('active');
+        }
+    });
+
+    // Update active category overview cards
+    document.querySelectorAll('.category-card').forEach(card => {
+        if (card.getAttribute('data-cust-filter') === category) {
+            card.classList.add('active');
+        } else {
+            card.classList.remove('active');
+        }
+    });
+
+    // Update active filter pills
+    document.querySelectorAll('.filter-pill').forEach(pill => {
+        if (pill.getAttribute('data-cust-filter') === category) {
+            pill.classList.add('active');
+        } else {
+            pill.classList.remove('active');
+        }
+    });
+
+    applyFilters();
+}
+
+function filterByCategory(category) {
+    filterByCustomerCategory(category);
+}
+
+function applyFilters() {
+    const searchInput = document.getElementById('searchInput');
+    const term = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+    filteredData = customersData.filter(c => {
+        const matchesSearch = !term || c.name.toLowerCase().includes(term) || c.mobile.includes(term);
+        if (!matchesSearch) return false;
+
+        if (currentCategoryFilter === 'all') return true;
+        if (currentCategoryFilter === 'gold') return c.category === 'UIC Gold';
+        if (currentCategoryFilter === 'b2b') return c.category === 'B2B';
+        if (currentCategoryFilter === 'overdue') return c.totalOverdue < -0.005;
+        if (currentCategoryFilter === 'clear') return Math.abs(c.totalOverdue) < 0.005;
+        return true;
+    });
+
+    sortData();
+    renderTable();
 }
 
 function renderTable() {
@@ -575,7 +765,7 @@ function renderTable() {
     tbody.innerHTML = '';
 
     if (filteredData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No matching customers found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No matching customers found.</td></tr>';
         return;
     }
 
@@ -585,14 +775,23 @@ function renderTable() {
         const statusIcon = isPositive ? 'trending-up' : 'trending-down';
         const statusClass = isPositive ? 'up' : 'down';
 
+        const categoryBadge = customer.category === 'UIC Gold'
+            ? `<span class="badge-cat badge-gold"><i data-lucide="award" style="width:12px;height:12px;"></i> UIC Gold</span>`
+            : `<span class="badge-cat badge-b2b"><i data-lucide="building-2" style="width:12px;height:12px;"></i> B2B</span>`;
+
+        const totalOverdueDisplay = Math.abs(customer.totalOverdue) < 0.005 
+            ? `<span class="zero-amount">0.00</span>` 
+            : `<span class="overdue-urgent">${customer.totalOverdue.toFixed(2)}</span>`;
+
         tr.innerHTML = `
             <td><div class="customer-info"><span class="customer-name">${customer.name}</span></div></td>
             <td>${customer.mobile}</td>
+            <td>${categoryBadge}</td>
             <td><div class="status-indicator ${statusClass}"><i data-lucide="${statusIcon}"></i></div></td>
-            <td class="amount overdue">${customer.totalOverdue.toFixed(2)}</td>
-            <td class="amount balance">${customer.totalPendingBalance.toFixed(2)}</td>
-            <td class="actions-col">
-                <button class="icon-btn" onclick="openStatement('${customer.key}')" title="View Unpaid Orders">
+            <td class="amount overdue text-right">${totalOverdueDisplay}</td>
+            <td class="amount balance text-right">${customer.totalPendingBalance.toFixed(2)}</td>
+            <td class="actions-col" style="text-align: center;">
+                <button class="icon-btn" onclick="openStatement('${customer.key}')" title="View Statement">
                     <i data-lucide="file-text"></i>
                 </button>
             </td>
@@ -644,6 +843,25 @@ function openStatement(key) {
     document.getElementById('stmtCurrentBalance').textContent = `${customer.totalPendingBalance.toFixed(2)}`;
     document.getElementById('stmtGeneratedAt').textContent = new Date().toLocaleString();
 
+    // Populate category in modal
+    const catEl = document.getElementById('stmtCustomerCategory');
+    if (catEl) {
+        catEl.innerHTML = customer.category === 'UIC Gold'
+            ? `<span class="badge-cat badge-gold"><i data-lucide="award" style="width:12px;height:12px;"></i> UIC Gold</span>`
+            : `<span class="badge-cat badge-b2b"><i data-lucide="building-2" style="width:12px;height:12px;"></i> B2B Customer</span>`;
+    }
+
+    // Populate category breakdown in modal
+    const stmt130 = document.getElementById('stmtCat1_30');
+    const stmt3160 = document.getElementById('stmtCat31_60');
+    const stmt6190 = document.getElementById('stmtCat61_90');
+    const stmt90P = document.getElementById('stmtCat90Plus');
+
+    if (stmt130) stmt130.textContent = (customer.overdue1_30 || 0).toFixed(2);
+    if (stmt3160) stmt3160.textContent = (customer.overdue31_60 || 0).toFixed(2);
+    if (stmt6190) stmt6190.textContent = (customer.overdue61_90 || 0).toFixed(2);
+    if (stmt90P) stmt90P.textContent = (customer.overdue90Plus || 0).toFixed(2);
+
     const stmtTbody = document.getElementById('statementTableBody');
     stmtTbody.innerHTML = '';
 
@@ -673,7 +891,15 @@ function renderStatementRow(tbody, t) {
         diffDays = Math.round((todayStart - dateStart) / (1000 * 60 * 60 * 24));
     }
     const isOverdue = diffDays > 30;
-    const statusText = isOverdue ? 'OVERDUE' : 'OPEN';
+    let statusText = isOverdue ? 'OVERDUE' : 'OPEN';
+    let catTag = '';
+    if (isOverdue) {
+        const overdueDays = diffDays - 30;
+        if (overdueDays <= 30) catTag = ' (1–30d)';
+        else if (overdueDays <= 60) catTag = ' (31–60d)';
+        else if (overdueDays <= 90) catTag = ' (61–90d)';
+        else catTag = ' (90+d)';
+    }
     const statusClass = isOverdue ? 'status-overdue' : 'status-open';
 
     const dueDate = t.date ? new Date(t.date) : null;
@@ -685,7 +911,7 @@ function renderStatementRow(tbody, t) {
         <td style="text-align: left !important; padding: 12px 16px !important; text-transform: capitalize;">${t.type} ${isPartial ? '<span class="badge badge-success" style="font-size: 0.6rem; padding: 2px 6px;">PARTIAL</span>' : ''}</td>
         <td style="text-align: left !important; padding: 12px 16px !important;">${t.orderId || '-'}</td>
         <td style="text-align: left !important; padding: 12px 16px !important;" class="stmt-type-order">DEBIT</td>
-        <td style="text-align: left !important; padding: 12px 16px !important;"><span class="status-badge ${statusClass}">${statusText}</span></td>
+        <td style="text-align: left !important; padding: 12px 16px !important;"><span class="status-badge ${statusClass}">${statusText}${catTag}</span></td>
         <td style="text-align: right !important; padding: 12px 16px !important;">${t.amount.toFixed(2)}</td>
         <td style="text-align: right !important; padding: 12px 16px !important;" class="stmt-type-order">${t.outstandingAmount.toFixed(2)}</td>
     `;
@@ -731,9 +957,7 @@ function setupSearch() {
             const currentView = activeNav ? activeNav.id.replace('nav-', '') : 'gold-customer';
             
             if (currentView === 'gold-customer') {
-                const term = e.target.value.toLowerCase();
-                filteredData = customersData.filter(c => c.name.toLowerCase().includes(term) || c.mobile.includes(term));
-                renderTable();
+                applyFilters();
             } else if (currentView === 'statements') {
                 renderBatchTable();
             }
@@ -762,7 +986,9 @@ function sortData() {
     filteredData.sort((a, b) => {
         let valA = a[column];
         let valB = b[column];
-        if (typeof valA === 'string') return valA.localeCompare(valB) * factor;
+        if (valA === undefined) valA = 0;
+        if (valB === undefined) valB = 0;
+        if (typeof valA === 'string' && typeof valB === 'string') return valA.localeCompare(valB) * factor;
         return (valA - valB) * factor;
     });
 }
@@ -909,13 +1135,28 @@ function renderPendingInvoicesTable() {
         }
         
         const isOverdue = diffDays > 30;
-        const statusText = isOverdue ? 'Overdue' : 'Not Yet Due';
+        let catBadge = '';
+        if (isOverdue) {
+            const overdueDays = diffDays - 30;
+            if (overdueDays <= 30) {
+                catBadge = `<span class="cat-badge badge-1-30" style="font-size: 0.65rem; padding: 2px 6px;">1–30d</span>`;
+            } else if (overdueDays <= 60) {
+                catBadge = `<span class="cat-badge badge-31-60" style="font-size: 0.65rem; padding: 2px 6px;">31–60d</span>`;
+            } else if (overdueDays <= 90) {
+                catBadge = `<span class="cat-badge badge-61-90" style="font-size: 0.65rem; padding: 2px 6px;">61–90d</span>`;
+            } else {
+                catBadge = `<span class="cat-badge badge-90-plus" style="font-size: 0.65rem; padding: 2px 6px;">90+d</span>`;
+            }
+        }
+        const statusDisplay = isOverdue 
+            ? `<span class="status-badge status-overdue">Overdue</span> ${catBadge}` 
+            : `<span class="status-badge status-open">Not Yet Due</span>`;
         const dueDateStr = formatDate(dueDate);
         const orderId = t.orderId || '-';
         
         const row = document.createElement('tr');
         row.innerHTML = `
-            <td>${statusText}</td>
+            <td>${statusDisplay}</td>
             <td style="white-space: nowrap;">${dateStr}</td>
             <td style="white-space: nowrap;">${dueDateStr}</td>
             <td>${orderId}</td>

@@ -94,17 +94,30 @@
                             </button>
                         </div>
                         <div class="stats-group">
-                            <div class="stat-card">
+                            <div class="stat-card clickable-stat" data-cust-filter="all" onclick="filterByCustomerCategory('all')" title="View All Customers">
                                 <span class="stat-label">Total Customers</span>
-                                <span class="stat-value" id="totalCustomers">-</span>
+                                <span class="stat-value" id="totalCustomers">27</span>
+                                <span class="stat-sublabel" id="custCategoryRatio">11 Gold &bull; 16 B2B</span>
                             </div>
-                            <div class="stat-card urgent">
+                            <div class="stat-card urgent clickable-stat" data-cust-filter="gold" onclick="filterByCustomerCategory('gold')" title="Click to filter UIC Gold Customers">
+                                <span class="stat-label"><span class="header-cat-pill gold">UIC GOLD</span> Overdue</span>
+                                <span class="stat-value" id="goldOverdueAmount">-36,181.52</span>
+                                <span class="stat-sublabel" id="goldCustomerCount">11 Customers</span>
+                            </div>
+                            <div class="stat-card urgent clickable-stat" data-cust-filter="b2b" onclick="filterByCustomerCategory('b2b')" title="Click to filter B2B Customers">
+                                <span class="stat-label"><span class="header-cat-pill b2b">B2B</span> Overdue</span>
+                                <span class="stat-value" id="b2bOverdueAmount">-3,03,974.20</span>
+                                <span class="stat-sublabel" id="b2bCustomerCount">16 Customers</span>
+                            </div>
+                            <div class="stat-card urgent clickable-stat" data-cust-filter="overdue" onclick="filterByCustomerCategory('overdue')" title="Click to filter All Overdue Customers">
                                 <span class="stat-label">Total Overdue</span>
-                                <span class="stat-value" id="totalOverdueAmount">-</span>
+                                <span class="stat-value" id="totalOverdueAmount">-3,40,155.72</span>
+                                <span class="stat-sublabel">Combined</span>
                             </div>
                             <div class="stat-card" style="color: var(--primary-color);">
                                 <span class="stat-label">Total Pending Balance</span>
-                                <span class="stat-value" id="totalPendingBalanceAmount">-</span>
+                                <span class="stat-value" id="totalPendingBalanceAmount">-9,84,697.87</span>
+                                <span class="stat-sublabel">Combined Balance</span>
                             </div>
                         </div>
                     </div>
@@ -112,21 +125,81 @@
 
                 <div id="errorMessage" class="error-banner" style="display: none;"></div>
 
+                <!-- Category Overdue Overview Cards: UIC Gold & B2B -->
+                <div class="category-summary-section">
+                    <div class="category-cards-grid two-cols">
+                        <div class="category-card gold-card" data-cust-filter="gold" onclick="filterByCustomerCategory('gold')" title="Click to filter UIC Gold Customers">
+                            <div class="cat-card-top">
+                                <span class="badge-cat badge-gold"><i data-lucide="award" class="cat-badge-icon"></i> UIC Gold Customer</span>
+                                <span class="cat-count-badge" id="cardGoldCount">11 Accounts</span>
+                            </div>
+                            <div class="cat-card-main">
+                                <span class="cat-amount gold" id="catCardGoldOverdue">-36,181.52</span>
+                                <span class="cat-label">Total Overdue (UIC Gold Customers)</span>
+                            </div>
+                            <div class="cat-card-footer">
+                                <span class="cat-card-subinfo" id="catCardGoldBalance">Balance: -1,38,724.98</span>
+                                <span class="cat-click-hint">Click to filter &rarr;</span>
+                            </div>
+                        </div>
+
+                        <div class="category-card b2b-card" data-cust-filter="b2b" onclick="filterByCustomerCategory('b2b')" title="Click to filter B2B Customers">
+                            <div class="cat-card-top">
+                                <span class="badge-cat badge-b2b"><i data-lucide="building-2" class="cat-badge-icon"></i> B2B Customer</span>
+                                <span class="cat-count-badge" id="cardB2BCount">16 Accounts</span>
+                            </div>
+                            <div class="cat-card-main">
+                                <span class="cat-amount b2b" id="catCardB2BOverdue">-3,03,974.20</span>
+                                <span class="cat-label">Total Overdue (B2B Customers)</span>
+                            </div>
+                            <div class="cat-card-footer">
+                                <span class="cat-card-subinfo" id="catCardB2BBalance">Balance: -8,45,972.89</span>
+                                <span class="cat-click-hint">Click to filter &rarr;</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Category Filter Tabs Bar -->
+                    <div class="category-filter-bar">
+                        <div class="filter-pills-label">
+                            <i data-lucide="filter" style="width: 15px; height: 15px;"></i> Filter by Category:
+                        </div>
+                        <div class="filter-pills">
+                            <button class="filter-pill active" data-cust-filter="all" onclick="filterByCustomerCategory('all')">
+                                All Customers <span class="pill-count" id="pillCountAll">27</span>
+                            </button>
+                            <button class="filter-pill" data-cust-filter="gold" onclick="filterByCustomerCategory('gold')">
+                                <span class="pill-dot dot-gold"></span> UIC Gold Customer <span class="pill-count" id="pillCountGold">11</span>
+                            </button>
+                            <button class="filter-pill" data-cust-filter="b2b" onclick="filterByCustomerCategory('b2b')">
+                                <span class="pill-dot dot-b2b"></span> B2B Customer <span class="pill-count" id="pillCountB2B">16</span>
+                            </button>
+                            <button class="filter-pill" data-cust-filter="overdue" onclick="filterByCustomerCategory('overdue')">
+                                <span class="pill-dot dot-overdue"></span> Overdue Only <span class="pill-count" id="pillCountOverdue">15</span>
+                            </button>
+                            <button class="filter-pill" data-cust-filter="clear" onclick="filterByCustomerCategory('clear')">
+                                <span class="pill-dot dot-clear"></span> No Overdue <span class="pill-count" id="pillCountClear">12</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="table-container card">
                     <table>
                         <thead>
                             <tr id="mainTableHeader">
                                 <th class="sortable" onclick="handleBatchSort('name', this)">Customer Name <i data-lucide="arrow-up-down" id="sort-icon-name-main"></i></th>
                                 <th class="sortable" onclick="handleBatchSort('mobile', this)">Mobile <i data-lucide="arrow-up-down" id="sort-icon-mobile-main"></i></th>
+                                <th class="sortable" onclick="handleBatchSort('category', this)">Category <i data-lucide="arrow-up-down" id="sort-icon-category-main"></i></th>
                                 <th>Status</th>
                                 <th class="sortable text-right" onclick="handleBatchSort('totalOverdue', this)">Total Overdue <i data-lucide="arrow-up-down" id="sort-icon-totalOverdue-main"></i></th>
                                 <th class="sortable text-right" onclick="handleBatchSort('totalPendingBalance', this)">Total Pending Balance <i data-lucide="arrow-up-down" id="sort-icon-totalPendingBalance-main"></i></th>
-                                <th class="actions-col">Statement</th>
+                                <th class="actions-col" style="text-align: center;">Statement</th>
                             </tr>
                         </thead>
                         <tbody id="tableBody">
                             <tr id="loader" class="loading-row">
-                                <td colspan="6">
+                                <td colspan="7">
                                     <div class="loader-container">
                                         <div class="loader"></div>
                                         <span>Fetching data from Google Sheets...</span>
@@ -318,12 +391,38 @@
                         <p id="stmtCustomerMobile"></p>
                     </div>
                     <div class="summary-col">
+                        <label>Customer Category</label>
+                        <p id="stmtCustomerCategory"></p>
+                    </div>
+                    <div class="summary-col">
                         <label>Overdue Amount</label>
                         <p id="stmtOverdueAmount" class="balance-text urgent"></p>
                     </div>
                     <div class="summary-col">
                         <label>Total Pending Balance</label>
                         <p id="stmtCurrentBalance" class="balance-text"></p>
+                    </div>
+                </div>
+
+                <div class="stmt-aging-bar">
+                    <div class="stmt-aging-title"><i data-lucide="layers" style="width: 14px; height: 14px;"></i> Category-Wise Overdue Breakdown:</div>
+                    <div class="stmt-aging-grid">
+                        <div class="stmt-aging-item">
+                            <span class="stmt-aging-label"><span class="pill-dot dot-1-30"></span> 1–30 Days</span>
+                            <span class="stmt-aging-val" id="stmtCat1_30">0.00</span>
+                        </div>
+                        <div class="stmt-aging-item">
+                            <span class="stmt-aging-label"><span class="pill-dot dot-31-60"></span> 31–60 Days</span>
+                            <span class="stmt-aging-val" id="stmtCat31_60">0.00</span>
+                        </div>
+                        <div class="stmt-aging-item">
+                            <span class="stmt-aging-label"><span class="pill-dot dot-61-90"></span> 61–90 Days</span>
+                            <span class="stmt-aging-val" id="stmtCat61_90">0.00</span>
+                        </div>
+                        <div class="stmt-aging-item">
+                            <span class="stmt-aging-label"><span class="pill-dot dot-90-plus"></span> 90+ Days</span>
+                            <span class="stmt-aging-val" id="stmtCat90Plus">0.00</span>
+                        </div>
                     </div>
                 </div>
 
@@ -352,7 +451,7 @@
 
     <div id="toastContainer"></div>
 
-    <script src="script.js?v=3"></script>
+    <script src="script.js?v=5"></script>
     <script>
         lucide.createIcons();
     </script>
