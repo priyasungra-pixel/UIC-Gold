@@ -308,12 +308,13 @@ async function generateStatementPDF(c) {
                 const dateStart = new Date(t.date.getFullYear(), t.date.getMonth(), t.date.getDate());
                 diffDays = Math.round((todayStart - dateStart) / (1000 * 60 * 60 * 24));
             }
+            const creditDays = getCreditDays(c.category);
             const dueDate = t.date ? new Date(t.date) : null;
-            if (dueDate) dueDate.setDate(dueDate.getDate() + 30);
+            if (dueDate) dueDate.setDate(dueDate.getDate() + creditDays);
 
             let statusText = 'OPEN';
-            if (diffDays > 30) {
-                const overdueDays = diffDays - 30;
+            if (diffDays > creditDays) {
+                const overdueDays = diffDays - creditDays;
                 if (overdueDays <= 30) statusText = 'OVERDUE (1–30d)';
                 else if (overdueDays <= 60) statusText = 'OVERDUE (31–60d)';
                 else if (overdueDays <= 90) statusText = 'OVERDUE (61–90d)';
@@ -513,6 +514,10 @@ function getCustomerCategory(name, address = '') {
     return isB2B ? 'B2B' : 'UIC Gold';
 }
 
+function getCreditDays(category) {
+    return category === 'B2B' ? 60 : 30;
+}
+
 function aggregateCustomerDataGviz(table) {
     const customers = {};
     const COL = { TYPE: 0, DATE: 1, NAME: 2, MOBILE: 3, ADDRESS: 4, AMOUNT: 11, BALANCE: 12 };
@@ -582,13 +587,14 @@ function aggregateCustomerDataGviz(table) {
         let overdue90Plus = 0;
         let overdueSum = 0;
 
+        const creditDays = getCreditDays(c.category);
         outstanding.forEach(t => {
             if (t.type === 'order' && t.date) {
                 const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
                 const dateStart = new Date(t.date.getFullYear(), t.date.getMonth(), t.date.getDate());
                 const diffDays = Math.round((todayStart - dateStart) / (1000 * 60 * 60 * 24));
-                if (diffDays > 30) {
-                    const overdueDays = diffDays - 30;
+                if (diffDays > creditDays) {
+                    const overdueDays = diffDays - creditDays;
                     overdueSum += t.outstandingAmount;
                     if (overdueDays <= 30) {
                         overdue1_30 += t.outstandingAmount;
@@ -666,8 +672,8 @@ function updateStats() {
     const goldCountEl = document.getElementById('goldCustomerCount');
     const b2bCountEl = document.getElementById('b2bCustomerCount');
     if (ratioEl) ratioEl.innerHTML = `${goldCustomers.length} Gold &bull; ${b2bCustomers.length} B2B`;
-    if (goldCountEl) goldCountEl.textContent = `${goldCustomers.length} Customers`;
-    if (b2bCountEl) b2bCountEl.textContent = `${b2bCustomers.length} Customers`;
+    if (goldCountEl) goldCountEl.innerHTML = `${goldCustomers.length} Customers &bull; 30d credit`;
+    if (b2bCountEl) b2bCountEl.innerHTML = `${b2bCustomers.length} Customers &bull; 60d credit`;
 
     // Update Category Overview Cards
     const cardGoldAmt = document.getElementById('catCardGoldOverdue');
@@ -870,14 +876,16 @@ function openStatement(key) {
             stmtTbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px;">Debt found in balance but no matching transactions identified.</td></tr>';
         }
     } else {
-        outstanding.forEach(t => renderStatementRow(stmtTbody, t));
+        outstanding.forEach(t => renderStatementRow(stmtTbody, t, customer));
     }
 
     document.getElementById('statementModal').classList.add('active');
     lucide.createIcons();
 }
 
-function renderStatementRow(tbody, t) {
+function renderStatementRow(tbody, t, customer) {
+    const cust = customer || currentStatementCustomer;
+    const creditDays = getCreditDays(cust ? cust.category : 'UIC Gold');
     const row = document.createElement('tr');
     const isPartial = t.outstandingAmount < t.amount;
     let diffDays = 0;
@@ -886,11 +894,11 @@ function renderStatementRow(tbody, t) {
         const dateStart = new Date(t.date.getFullYear(), t.date.getMonth(), t.date.getDate());
         diffDays = Math.round((todayStart - dateStart) / (1000 * 60 * 60 * 24));
     }
-    const isOverdue = diffDays > 30;
+    const isOverdue = diffDays > creditDays;
     let statusText = isOverdue ? 'OVERDUE' : 'OPEN';
     let catTag = '';
     if (isOverdue) {
-        const overdueDays = diffDays - 30;
+        const overdueDays = diffDays - creditDays;
         if (overdueDays <= 30) catTag = ' (1–30d)';
         else if (overdueDays <= 60) catTag = ' (31–60d)';
         else if (overdueDays <= 90) catTag = ' (61–90d)';
@@ -899,7 +907,7 @@ function renderStatementRow(tbody, t) {
     const statusClass = isOverdue ? 'status-overdue' : 'status-open';
 
     const dueDate = t.date ? new Date(t.date) : null;
-    if (dueDate) dueDate.setDate(dueDate.getDate() + 30);
+    if (dueDate) dueDate.setDate(dueDate.getDate() + creditDays);
 
     row.innerHTML = `
         <td style="text-align: left !important; padding: 12px 16px !important;">${formatDate(t.date)}</td>
@@ -1051,10 +1059,12 @@ function renderPendingInvoicesTable() {
                 valB = b.transaction.date ? b.transaction.date.getTime() : 0;
                 break;
             case 'dueDate':
+                const creditA = getCreditDays(a.customer.category);
                 const da = a.transaction.date ? new Date(a.transaction.date) : new Date(0);
-                if (a.transaction.date) da.setDate(da.getDate() + 30);
+                if (a.transaction.date) da.setDate(da.getDate() + creditA);
+                const creditB = getCreditDays(b.customer.category);
                 const db = b.transaction.date ? new Date(b.transaction.date) : new Date(0);
-                if (b.transaction.date) db.setDate(db.getDate() + 30);
+                if (b.transaction.date) db.setDate(db.getDate() + creditB);
                 valA = da.getTime();
                 valB = db.getTime();
                 break;
@@ -1071,8 +1081,8 @@ function renderPendingInvoicesTable() {
                     const dateStart = new Date(b.transaction.date.getFullYear(), b.transaction.date.getMonth(), b.transaction.date.getDate());
                     diffB = Math.round((todayStart - dateStart) / (1000 * 60 * 60 * 24));
                 }
-                valA = diffA > 30 ? 1 : 0;
-                valB = diffB > 30 ? 1 : 0;
+                valA = diffA > getCreditDays(a.customer.category) ? 1 : 0;
+                valB = diffB > getCreditDays(b.customer.category) ? 1 : 0;
                 break;
             case 'orderId':
                 valA = a.transaction.orderId || '';
@@ -1120,20 +1130,21 @@ function renderPendingInvoicesTable() {
         let dateStr = 'N/A';
         let timeStr = '';
         
+        const creditDays = getCreditDays(c.category);
         if (date) {
             const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
             const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
             diffDays = Math.round((todayStart - dateStart) / (1000 * 60 * 60 * 24));
             dueDate = new Date(date);
-            dueDate.setDate(dueDate.getDate() + 30);
+            dueDate.setDate(dueDate.getDate() + creditDays);
             dateStr = formatDate(date);
             timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         }
         
-        const isOverdue = diffDays > 30;
+        const isOverdue = diffDays > creditDays;
         let catBadge = '';
         if (isOverdue) {
-            const overdueDays = diffDays - 30;
+            const overdueDays = diffDays - creditDays;
             if (overdueDays <= 30) {
                 catBadge = `<span class="cat-badge badge-1-30" style="font-size: 0.65rem; padding: 2px 6px;">1–30d</span>`;
             } else if (overdueDays <= 60) {

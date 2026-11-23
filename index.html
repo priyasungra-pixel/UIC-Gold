@@ -102,16 +102,16 @@
                             <div class="stat-card urgent clickable-stat" data-cust-filter="gold" onclick="filterByCustomerCategory('gold')" title="Click to filter UIC Gold Customers">
                                 <span class="stat-label"><span class="header-cat-pill gold">UIC GOLD</span> Overdue</span>
                                 <span class="stat-value" id="goldOverdueAmount">-36,181.52</span>
-                                <span class="stat-sublabel" id="goldCustomerCount">11 Customers</span>
+                                <span class="stat-sublabel" id="goldCustomerCount">11 Customers &bull; 30d credit</span>
                             </div>
                             <div class="stat-card urgent clickable-stat" data-cust-filter="b2b" onclick="filterByCustomerCategory('b2b')" title="Click to filter B2B Customers">
                                 <span class="stat-label"><span class="header-cat-pill b2b">B2B</span> Overdue</span>
-                                <span class="stat-value" id="b2bOverdueAmount">-3,03,974.20</span>
-                                <span class="stat-sublabel" id="b2bCustomerCount">16 Customers</span>
+                                <span class="stat-value" id="b2bOverdueAmount">-1,14,834.20</span>
+                                <span class="stat-sublabel" id="b2bCustomerCount">16 Customers &bull; 60d credit</span>
                             </div>
                             <div class="stat-card urgent clickable-stat" data-cust-filter="overdue" onclick="filterByCustomerCategory('overdue')" title="Click to filter All Overdue Customers">
                                 <span class="stat-label">Total Overdue</span>
-                                <span class="stat-value" id="totalOverdueAmount">-3,40,155.72</span>
+                                <span class="stat-value" id="totalOverdueAmount">-1,51,015.72</span>
                                 <span class="stat-sublabel">Combined</span>
                             </div>
                             <div class="stat-card" style="color: var(--primary-color);">
@@ -135,7 +135,7 @@
                             </div>
                             <div class="cat-card-main">
                                 <span class="cat-amount gold" id="catCardGoldOverdue">-36,181.52</span>
-                                <span class="cat-label">Total Overdue (UIC Gold Customers)</span>
+                                <span class="cat-label">Total Overdue (UIC Gold Customers &bull; 30d credit)</span>
                             </div>
                             <div class="cat-card-footer">
                                 <span class="cat-card-subinfo" id="catCardGoldBalance">Balance: -1,38,724.98</span>
@@ -149,8 +149,8 @@
                                 <span class="cat-count-badge" id="cardB2BCount">16 Accounts</span>
                             </div>
                             <div class="cat-card-main">
-                                <span class="cat-amount b2b" id="catCardB2BOverdue">-3,03,974.20</span>
-                                <span class="cat-label">Total Overdue (B2B Customers)</span>
+                                <span class="cat-amount b2b" id="catCardB2BOverdue">-1,14,834.20</span>
+                                <span class="cat-label">Total Overdue (B2B Customers &bull; 60d credit)</span>
                             </div>
                             <div class="cat-card-footer">
                                 <span class="cat-card-subinfo" id="catCardB2BBalance">Balance: -8,45,972.89</span>
@@ -175,10 +175,10 @@
                                 <span class="pill-dot dot-b2b"></span> B2B Customer <span class="pill-count" id="pillCountB2B">16</span>
                             </button>
                             <button class="filter-pill" data-cust-filter="overdue" onclick="filterByCustomerCategory('overdue')">
-                                <span class="pill-dot dot-overdue"></span> Overdue Only <span class="pill-count" id="pillCountOverdue">15</span>
+                                <span class="pill-dot dot-overdue"></span> Overdue Only <span class="pill-count" id="pillCountOverdue">10</span>
                             </button>
                             <button class="filter-pill" data-cust-filter="clear" onclick="filterByCustomerCategory('clear')">
-                                <span class="pill-dot dot-clear"></span> No Overdue <span class="pill-count" id="pillCountClear">12</span>
+                                <span class="pill-dot dot-clear"></span> No Overdue <span class="pill-count" id="pillCountClear">17</span>
                             </button>
                         </div>
                     </div>
@@ -451,7 +451,7 @@
 
     <div id="toastContainer"></div>
 
-    <script src="script.js?v=6"></script>
+    <script src="script.js?v=7"></script>
     <script>
         lucide.createIcons();
     </script>
