@@ -81,106 +81,86 @@
                         <h1>Gold Customer</h1>
                         <p class="subtitle">Managing premium customer accounts and balances</p>
                     </div>
-                    <div style="display: flex; gap: 12px; align-items: flex-end;">
-                        <div class="export-group" style="display: flex; gap: 8px;">
-                            <button class="btn btn-secondary" onclick="exportReport('pdf')" title="Export as PDF">
-                                <i data-lucide="file-text"></i> PDF
-                            </button>
-                            <button class="btn btn-secondary" onclick="exportReport('csv')" title="Export as CSV">
-                                <i data-lucide="file-spreadsheet"></i> CSV
-                            </button>
-                            <button class="btn btn-secondary" onclick="exportReport('excel')" title="Export as Excel">
-                                <i data-lucide="table"></i> Excel
-                            </button>
+                    <div class="export-group">
+                        <button class="btn btn-secondary" onclick="exportReport('pdf')" title="Export as PDF">
+                            <i data-lucide="file-text"></i> PDF
+                        </button>
+                        <button class="btn btn-secondary" onclick="exportReport('csv')" title="Export as CSV">
+                            <i data-lucide="file-spreadsheet"></i> CSV
+                        </button>
+                        <button class="btn btn-secondary" onclick="exportReport('excel')" title="Export as Excel">
+                            <i data-lucide="table"></i> Excel
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 5 Stat Cards in clean, responsive Grid -->
+                <div class="dashboard-stats-grid">
+                    <div class="stat-card clickable-stat active" data-cust-filter="all" onclick="filterByCustomerCategory('all')" title="View All Customers">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Total Customers</span>
+                            <i data-lucide="users" class="stat-icon-muted"></i>
                         </div>
-                        <div class="stats-group">
-                            <div class="stat-card clickable-stat" data-cust-filter="all" onclick="filterByCustomerCategory('all')" title="View All Customers">
-                                <span class="stat-label">Total Customers</span>
-                                <span class="stat-value" id="totalCustomers">27</span>
-                                <span class="stat-sublabel" id="custCategoryRatio">11 Gold &bull; 16 B2B</span>
-                            </div>
-                            <div class="stat-card urgent clickable-stat" data-cust-filter="gold" onclick="filterByCustomerCategory('gold')" title="Click to filter UIC Gold Customers">
-                                <span class="stat-label"><span class="header-cat-pill gold">UIC GOLD</span> Overdue</span>
-                                <span class="stat-value" id="goldOverdueAmount">-36,181.52</span>
-                                <span class="stat-sublabel" id="goldCustomerCount">11 Customers &bull; 30d credit</span>
-                            </div>
-                            <div class="stat-card urgent clickable-stat" data-cust-filter="b2b" onclick="filterByCustomerCategory('b2b')" title="Click to filter B2B Customers">
-                                <span class="stat-label"><span class="header-cat-pill b2b">B2B</span> Overdue</span>
-                                <span class="stat-value" id="b2bOverdueAmount">-1,14,834.20</span>
-                                <span class="stat-sublabel" id="b2bCustomerCount">16 Customers &bull; 60d credit</span>
-                            </div>
-                            <div class="stat-card urgent clickable-stat" data-cust-filter="overdue" onclick="filterByCustomerCategory('overdue')" title="Click to filter All Overdue Customers">
-                                <span class="stat-label">Total Overdue</span>
-                                <span class="stat-value" id="totalOverdueAmount">-1,51,015.72</span>
-                                <span class="stat-sublabel">Combined</span>
-                            </div>
-                            <div class="stat-card" style="color: var(--primary-color);">
-                                <span class="stat-label">Total Pending Balance</span>
-                                <span class="stat-value" id="totalPendingBalanceAmount">-9,84,697.87</span>
-                                <span class="stat-sublabel">Combined Balance</span>
-                            </div>
+                        <span class="stat-value" id="totalCustomers">27</span>
+                        <span class="stat-sublabel" id="custCategoryRatio">11 Gold &bull; 16 B2B</span>
+                    </div>
+                    <div class="stat-card urgent clickable-stat" data-cust-filter="gold" onclick="filterByCustomerCategory('gold')" title="Click to filter UIC Gold Customers">
+                        <div class="stat-card-header">
+                            <span class="stat-label"><span class="header-cat-pill gold">UIC GOLD</span> Overdue</span>
+                            <i data-lucide="award" class="stat-icon-gold"></i>
                         </div>
+                        <span class="stat-value" id="goldOverdueAmount">-36,181.52</span>
+                        <span class="stat-sublabel" id="goldCustomerCount">11 Customers &bull; 30d credit</span>
+                    </div>
+                    <div class="stat-card urgent clickable-stat" data-cust-filter="b2b" onclick="filterByCustomerCategory('b2b')" title="Click to filter B2B Customers">
+                        <div class="stat-card-header">
+                            <span class="stat-label"><span class="header-cat-pill b2b">B2B</span> Overdue</span>
+                            <i data-lucide="building-2" class="stat-icon-b2b"></i>
+                        </div>
+                        <span class="stat-value" id="b2bOverdueAmount">-1,14,834.20</span>
+                        <span class="stat-sublabel" id="b2bCustomerCount">16 Customers &bull; 60d credit</span>
+                    </div>
+                    <div class="stat-card urgent clickable-stat" data-cust-filter="overdue" onclick="filterByCustomerCategory('overdue')" title="Click to filter All Overdue Customers">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Total Overdue</span>
+                            <i data-lucide="alert-circle" class="stat-icon-danger"></i>
+                        </div>
+                        <span class="stat-value" id="totalOverdueAmount">-1,51,015.72</span>
+                        <span class="stat-sublabel">Combined</span>
+                    </div>
+                    <div class="stat-card stat-balance">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Total Pending Balance</span>
+                            <i data-lucide="wallet" class="stat-icon-primary"></i>
+                        </div>
+                        <span class="stat-value" id="totalPendingBalanceAmount">-9,84,697.87</span>
+                        <span class="stat-sublabel">Combined Balance</span>
                     </div>
                 </div>
 
                 <div id="errorMessage" class="error-banner" style="display: none;"></div>
 
-                <!-- Category Overdue Overview Cards: UIC Gold & B2B -->
-                <div class="category-summary-section">
-                    <div class="category-cards-grid two-cols">
-                        <div class="category-card gold-card" data-cust-filter="gold" onclick="filterByCustomerCategory('gold')" title="Click to filter UIC Gold Customers">
-                            <div class="cat-card-top">
-                                <span class="badge-cat badge-gold"><i data-lucide="award" class="cat-badge-icon"></i> UIC Gold Customer</span>
-                                <span class="cat-count-badge" id="cardGoldCount">11 Accounts</span>
-                            </div>
-                            <div class="cat-card-main">
-                                <span class="cat-amount gold" id="catCardGoldOverdue">-36,181.52</span>
-                                <span class="cat-label">Total Overdue (UIC Gold Customers &bull; 30d credit)</span>
-                            </div>
-                            <div class="cat-card-footer">
-                                <span class="cat-card-subinfo" id="catCardGoldBalance">Balance: -1,38,724.98</span>
-                                <span class="cat-click-hint">Click to filter &rarr;</span>
-                            </div>
-                        </div>
-
-                        <div class="category-card b2b-card" data-cust-filter="b2b" onclick="filterByCustomerCategory('b2b')" title="Click to filter B2B Customers">
-                            <div class="cat-card-top">
-                                <span class="badge-cat badge-b2b"><i data-lucide="building-2" class="cat-badge-icon"></i> B2B Customer</span>
-                                <span class="cat-count-badge" id="cardB2BCount">16 Accounts</span>
-                            </div>
-                            <div class="cat-card-main">
-                                <span class="cat-amount b2b" id="catCardB2BOverdue">-1,14,834.20</span>
-                                <span class="cat-label">Total Overdue (B2B Customers &bull; 60d credit)</span>
-                            </div>
-                            <div class="cat-card-footer">
-                                <span class="cat-card-subinfo" id="catCardB2BBalance">Balance: -8,45,972.89</span>
-                                <span class="cat-click-hint">Click to filter &rarr;</span>
-                            </div>
-                        </div>
+                <!-- Category Filter Tabs Bar -->
+                <div class="category-filter-bar">
+                    <div class="filter-pills-label">
+                        <i data-lucide="filter" style="width: 15px; height: 15px;"></i> Filter by Category:
                     </div>
-
-                    <!-- Category Filter Tabs Bar -->
-                    <div class="category-filter-bar">
-                        <div class="filter-pills-label">
-                            <i data-lucide="filter" style="width: 15px; height: 15px;"></i> Filter by Category:
-                        </div>
-                        <div class="filter-pills">
-                            <button class="filter-pill active" data-cust-filter="all" onclick="filterByCustomerCategory('all')">
-                                All Customers <span class="pill-count" id="pillCountAll">27</span>
-                            </button>
-                            <button class="filter-pill" data-cust-filter="gold" onclick="filterByCustomerCategory('gold')">
-                                <span class="pill-dot dot-gold"></span> UIC Gold Customer <span class="pill-count" id="pillCountGold">11</span>
-                            </button>
-                            <button class="filter-pill" data-cust-filter="b2b" onclick="filterByCustomerCategory('b2b')">
-                                <span class="pill-dot dot-b2b"></span> B2B Customer <span class="pill-count" id="pillCountB2B">16</span>
-                            </button>
-                            <button class="filter-pill" data-cust-filter="overdue" onclick="filterByCustomerCategory('overdue')">
-                                <span class="pill-dot dot-overdue"></span> Overdue Only <span class="pill-count" id="pillCountOverdue">10</span>
-                            </button>
-                            <button class="filter-pill" data-cust-filter="clear" onclick="filterByCustomerCategory('clear')">
-                                <span class="pill-dot dot-clear"></span> No Overdue <span class="pill-count" id="pillCountClear">17</span>
-                            </button>
-                        </div>
+                    <div class="filter-pills">
+                        <button class="filter-pill active" data-cust-filter="all" onclick="filterByCustomerCategory('all')">
+                            All Customers <span class="pill-count" id="pillCountAll">27</span>
+                        </button>
+                        <button class="filter-pill" data-cust-filter="gold" onclick="filterByCustomerCategory('gold')">
+                            <span class="pill-dot dot-gold"></span> UIC Gold Customer <span class="pill-count" id="pillCountGold">11</span>
+                        </button>
+                        <button class="filter-pill" data-cust-filter="b2b" onclick="filterByCustomerCategory('b2b')">
+                            <span class="pill-dot dot-b2b"></span> B2B Customer <span class="pill-count" id="pillCountB2B">16</span>
+                        </button>
+                        <button class="filter-pill" data-cust-filter="overdue" onclick="filterByCustomerCategory('overdue')">
+                            <span class="pill-dot dot-overdue"></span> Overdue Only <span class="pill-count" id="pillCountOverdue">10</span>
+                        </button>
+                        <button class="filter-pill" data-cust-filter="clear" onclick="filterByCustomerCategory('clear')">
+                            <span class="pill-dot dot-clear"></span> No Overdue <span class="pill-count" id="pillCountClear">17</span>
+                        </button>
                     </div>
                 </div>
 
@@ -451,7 +431,7 @@
 
     <div id="toastContainer"></div>
 
-    <script src="script.js?v=7"></script>
+    <script src="script.js?v=8"></script>
     <script>
         lucide.createIcons();
     </script>
