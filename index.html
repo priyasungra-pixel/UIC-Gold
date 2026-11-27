@@ -13,6 +13,9 @@
     <!-- PDF Generation Libraries (jsPDF + AutoTable is more reliable for local files) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    
+    <!-- Chart.js for Reports & Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="app-container">
@@ -266,27 +269,179 @@
                 <div class="content-header">
                     <div class="title-group">
                         <h1>Reports & Analytics</h1>
-                        <p class="subtitle">Visual insights into outstanding debt</p>
+                        <p class="subtitle">Customer purchase volume, daily due timeline, payment recovery, and aging analysis</p>
+                    </div>
+                    <div class="export-group">
+                        <button class="btn btn-secondary" onclick="exportAnalyticsReport('pdf')" title="Export Analytics Report as PDF">
+                            <i data-lucide="file-text"></i> PDF Report
+                        </button>
+                        <button class="btn btn-secondary" onclick="exportAnalyticsReport('csv')" title="Export Day-wise Data as CSV">
+                            <i data-lucide="file-spreadsheet"></i> CSV Data
+                        </button>
                     </div>
                 </div>
-                <div class="stats-group" style="margin-bottom: 32px;">
-                    <div class="stat-card">
-                        <span class="stat-label">Recovery Rate</span>
-                        <span class="stat-value" style="color: var(--success);">84.2%</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-label">Avg. Payment Delay</span>
-                        <span class="stat-value">12 Days</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-label">Monthly Growth</span>
-                        <span class="stat-value" style="color: var(--primary-color);">+15%</span>
+
+                <!-- Analytics Filter Control Bar -->
+                <div class="analytics-filter-card card">
+                    <div class="analytics-filter-row">
+                        <div class="analytics-filter-item customer-picker">
+                            <label for="analyticsCustomerSelect"><i data-lucide="user"></i> Select Customer:</label>
+                            <select id="analyticsCustomerSelect" class="form-select" onchange="onAnalyticsCustomerChange()">
+                                <option value="all">📊 All Customers (Consolidated Overview)</option>
+                            </select>
+                        </div>
+                        <div class="analytics-filter-item category-filter">
+                            <label><i data-lucide="filter"></i> Category:</label>
+                            <div class="filter-pills" style="margin-top: 2px;">
+                                <button class="filter-pill active" id="repPillAll" data-rep-cat="all" onclick="setAnalyticsCategory('all')">
+                                    All
+                                </button>
+                                <button class="filter-pill" id="repPillGold" data-rep-cat="gold" onclick="setAnalyticsCategory('gold')">
+                                    <span class="pill-dot dot-gold"></span> UIC Gold
+                                </button>
+                                <button class="filter-pill" id="repPillB2B" data-rep-cat="b2b" onclick="setAnalyticsCategory('b2b')">
+                                    <span class="pill-dot dot-b2b"></span> B2B
+                                </button>
+                            </div>
+                        </div>
+                        <div class="analytics-filter-item timeframe-filter">
+                            <label for="analyticsTimeframe"><i data-lucide="calendar"></i> Time Range:</label>
+                            <select id="analyticsTimeframe" class="form-select" onchange="onAnalyticsFilterChange()">
+                                <option value="all">All Time</option>
+                                <option value="30">Last 30 Days</option>
+                                <option value="60">Last 60 Days</option>
+                                <option value="90">Last 90 Days</option>
+                                <option value="180">Last 6 Months</option>
+                                <option value="365">Last 1 Year</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
-                <div class="card" style="padding: 40px; text-align: center; color: var(--text-muted);">
-                    <i data-lucide="bar-chart-3" style="width: 48px; height: 48px; margin-bottom: 16px; opacity: 0.5;"></i>
-                    <h3>Analytics Dashboard</h3>
-                    <p>Real-time trend analysis and PDF summary reports are currently in development.</p>
+
+                <!-- Dynamic Analytics KPI Cards Grid -->
+                <div class="dashboard-stats-grid" id="analyticsStatsGrid">
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Total Purchased</span>
+                            <i data-lucide="shopping-cart" class="stat-icon-primary"></i>
+                        </div>
+                        <span class="stat-value" id="repTotalPurchased">0.00</span>
+                        <span class="stat-sublabel" id="repOrderCount">0 Orders</span>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Total Paid / Cleared</span>
+                            <i data-lucide="check-circle-2" style="width: 16px; height: 16px; color: var(--success);"></i>
+                        </div>
+                        <span class="stat-value" id="repTotalPaid" style="color: var(--success);">0.00</span>
+                        <span class="stat-sublabel" id="repRecoveryRate">Recovery: 0%</span>
+                    </div>
+
+                    <div class="stat-card stat-balance">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Current Due / Balance</span>
+                            <i data-lucide="wallet" class="stat-icon-primary"></i>
+                        </div>
+                        <span class="stat-value" id="repCurrentBalance">0.00</span>
+                        <span class="stat-sublabel" id="repBalanceStatus">Net Account Balance</span>
+                    </div>
+
+                    <div class="stat-card urgent">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Total Overdue</span>
+                            <i data-lucide="alert-circle" class="stat-icon-danger"></i>
+                        </div>
+                        <span class="stat-value" id="repTotalOverdue">0.00</span>
+                        <span class="stat-sublabel" id="repOverdueCreditTerms">Past Credit Period</span>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-label" id="repCard5Title">Credit Term / Status</span>
+                            <i data-lucide="shield-check" class="stat-icon-muted"></i>
+                        </div>
+                        <span class="stat-value" id="repCard5Value" style="font-size: 1.15rem;">Active</span>
+                        <span class="stat-sublabel" id="repCard5Sub">27 Total Accounts</span>
+                    </div>
+                </div>
+
+                <!-- Primary Chart: Day-Wise Purchase & Due Timeline -->
+                <div class="card analytics-chart-card" style="margin-bottom: 24px;">
+                    <div class="chart-header">
+                        <div>
+                            <h3 id="timelineChartTitle">Day-Wise Purchase & Due Amount Timeline</h3>
+                            <p class="chart-subtitle" id="timelineChartSubtitle">Daily purchase orders, payment receipts, and net outstanding due over time</p>
+                        </div>
+                        <div class="chart-legend-row">
+                            <span class="chart-legend-badge badge-purchase"><span class="legend-dot bg-blue"></span> Purchase (Debit)</span>
+                            <span class="chart-legend-badge badge-payment"><span class="legend-dot bg-green"></span> Payment (Credit)</span>
+                            <span class="chart-legend-badge badge-due"><span class="legend-dot bg-red"></span> Net Due Balance</span>
+                        </div>
+                    </div>
+                    <div class="chart-container" style="position: relative; height: 350px; width: 100%;">
+                        <canvas id="timelineChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Secondary Charts Grid: Two Columns -->
+                <div class="analytics-charts-grid two-cols" style="margin-bottom: 24px;">
+                    <div class="card analytics-chart-card">
+                        <div class="chart-header">
+                            <div>
+                                <h3 id="secondaryChartTitle">Top Customers: Purchases vs Outstanding Due</h3>
+                                <p class="chart-subtitle" id="secondaryChartSubtitle">Comparison of high-volume customer accounts and their unpaid balance</p>
+                            </div>
+                        </div>
+                        <div class="chart-container" style="position: relative; height: 320px; width: 100%;">
+                            <canvas id="secondaryChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="card analytics-chart-card">
+                        <div class="chart-header">
+                            <div>
+                                <h3>Overdue Aging Breakdown</h3>
+                                <p class="chart-subtitle">Distribution of outstanding amounts past credit window</p>
+                            </div>
+                        </div>
+                        <div class="chart-container" style="position: relative; height: 320px; width: 100%;">
+                            <canvas id="agingChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detailed Day-Wise Transaction & Ledger Breakdown Table -->
+                <div class="card" style="padding: 24px; margin-bottom: 32px;">
+                    <div class="chart-header" style="margin-bottom: 16px;">
+                        <div>
+                            <h3 id="analyticsTableTitle">Day-Wise Purchase & Payment Ledger</h3>
+                            <p class="chart-subtitle" id="analyticsTableSubtitle">Chronological order list with purchase amount, payment receipts, and balance</p>
+                        </div>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <input type="text" id="analyticsTableSearch" placeholder="Filter ledger..." class="form-input-sm" onkeyup="filterAnalyticsTable()">
+                        </div>
+                    </div>
+                    <div class="table-container" style="box-shadow: none; border: 1px solid var(--border-color); border-radius: 10px;">
+                        <table class="batch-table" id="analyticsDataTable">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Order ID</th>
+                                    <th>Customer Name</th>
+                                    <th>Category</th>
+                                    <th>Transaction Type</th>
+                                    <th class="text-right">Purchase (Debit)</th>
+                                    <th class="text-right">Payment (Credit)</th>
+                                    <th class="text-right">Balance</th>
+                                    <th style="text-align: center;">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="analyticsTableBody">
+                                <tr><td colspan="9" style="text-align: center; padding: 24px;">Loading analytics...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </section>
 
@@ -431,7 +586,7 @@
 
     <div id="toastContainer"></div>
 
-    <script src="script.js?v=8"></script>
+    <script src="script.js?v=9"></script>
     <script>
         lucide.createIcons();
     </script>

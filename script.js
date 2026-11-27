@@ -65,6 +65,8 @@ function switchView(viewId) {
 
     if (viewId === 'pending-invoices') {
         renderPendingInvoicesTable();
+    } else if (viewId === 'reports') {
+        initReportsView();
     }
 
     lucide.createIcons();
@@ -482,6 +484,11 @@ window.handleResponse = function (response) {
         updateStats();
         applyFilters();
         renderPendingInvoicesTable();
+        populateAnalyticsCustomerDropdown();
+        const repView = document.getElementById('view-reports');
+        if (repView && repView.style.display !== 'none') {
+            renderReportsView();
+        }
         hideLoader();
         showToast("Data synced!");
     } catch (err) {
@@ -1175,4 +1182,738 @@ function renderPendingInvoicesTable() {
         `;
         tbody.appendChild(row);
     });
+}
+
+// ==========================================================================
+// Reports & Analytics Interactive Dashboard Logic
+// ==========================================================================
+
+let currentAnalyticsCategory = 'all';
+let currentAnalyticsCustomerKey = 'all';
+let currentAnalyticsTimeframe = 'all';
+let timelineChartInstance = null;
+let secondaryChartInstance = null;
+let agingChartInstance = null;
+let analyticsLedgerRecords = [];
+
+function initReportsView() {
+    populateAnalyticsCustomerDropdown();
+    renderReportsView();
+}
+
+function populateAnalyticsCustomerDropdown() {
+    const select = document.getElementById('analyticsCustomerSelect');
+    if (!select) return;
+
+    const prevVal = currentAnalyticsCustomerKey;
+    select.innerHTML = '<option value="all">📊 All Customers (Consolidated Overview)</option>';
+
+    let list = customersData.slice();
+    if (currentAnalyticsCategory === 'gold') {
+        list = list.filter(c => c.category === 'UIC Gold');
+    } else if (currentAnalyticsCategory === 'b2b') {
+        list = list.filter(c => c.category === 'B2B');
+    }
+
+    list.sort((a, b) => a.name.localeCompare(b.name));
+
+    list.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.key;
+        opt.textContent = `${c.name} [${c.category}] - Bal: ₹${c.totalPendingBalance.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+        select.appendChild(opt);
+    });
+
+    if (list.some(c => c.key === prevVal)) {
+        select.value = prevVal;
+        currentAnalyticsCustomerKey = prevVal;
+    } else {
+        select.value = 'all';
+        currentAnalyticsCustomerKey = 'all';
+    }
+}
+
+function setAnalyticsCategory(category) {
+    currentAnalyticsCategory = category;
+
+    ['all', 'gold', 'b2b'].forEach(cat => {
+        const btn = document.getElementById(cat === 'all' ? 'repPillAll' : (cat === 'gold' ? 'repPillGold' : 'repPillB2B'));
+        if (btn) {
+            if (category === cat) btn.classList.add('active');
+            else btn.classList.remove('active');
+        }
+    });
+
+    populateAnalyticsCustomerDropdown();
+    renderReportsView();
+}
+
+function onAnalyticsCustomerChange() {
+    const select = document.getElementById('analyticsCustomerSelect');
+    if (select) {
+        currentAnalyticsCustomerKey = select.value;
+    }
+    renderReportsView();
+}
+
+function onAnalyticsFilterChange() {
+    const timeSelect = document.getElementById('analyticsTimeframe');
+    if (timeSelect) {
+        currentAnalyticsTimeframe = timeSelect.value;
+    }
+    renderReportsView();
+}
+
+function renderReportsView() {
+    if (!customersData || customersData.length === 0) return;
+
+    // 1. Filter customers
+    let activeCustomers = customersData.slice();
+    const isSingleCustomer = currentAnalyticsCustomerKey !== 'all';
+
+    if (isSingleCustomer) {
+        activeCustomers = activeCustomers.filter(c => c.key === currentAnalyticsCustomerKey);
+        if (activeCustomers.length === 0) activeCustomers = customersData.slice();
+    } else if (currentAnalyticsCategory === 'gold') {
+        activeCustomers = activeCustomers.filter(c => c.category === 'UIC Gold');
+    } else if (currentAnalyticsCategory === 'b2b') {
+        activeCustomers = activeCustomers.filter(c => c.category === 'B2B');
+    }
+
+    // 2. Identify timeframe cutoff
+    let cutoffDate = null;
+    if (currentAnalyticsTimeframe !== 'all') {
+        const days = parseInt(currentAnalyticsTimeframe, 10);
+        if (!isNaN(days)) {
+            cutoffDate = new Date(today.getTime() - days * 24 * 60 * 60 * 1000);
+        }
+    }
+
+    // 3. Compute KPI Stats
+    let totalPurchases = 0;
+    let orderCount = 0;
+    let totalPaid = 0;
+    let allTransactions = [];
+
+    activeCustomers.forEach(c => {
+        c.transactions.forEach(t => {
+            allTransactions.push({
+                customer: c,
+                date: t.date,
+                amount: t.amount,
+                isAdditive: t.isAdditive,
+                type: t.type,
+                orderId: t.orderId,
+                calculatedBalance: t.calculatedBalance
+            });
+
+            if (!t.isAdditive) {
+                totalPurchases += t.amount;
+                orderCount++;
+            } else {
+                totalPaid += t.amount;
+            }
+        });
+    });
+
+    const totalPendingBalance = activeCustomers.reduce((sum, c) => sum + c.totalPendingBalance, 0);
+    const totalOverdue = activeCustomers.reduce((sum, c) => sum + c.totalOverdue, 0);
+    const recoveryRate = totalPurchases > 0 ? (totalPaid / totalPurchases) * 100 : 100;
+
+    // Update KPI elements
+    const elPurchased = document.getElementById('repTotalPurchased');
+    const elOrderCount = document.getElementById('repOrderCount');
+    const elPaid = document.getElementById('repTotalPaid');
+    const elRecovery = document.getElementById('repRecoveryRate');
+    const elBalance = document.getElementById('repCurrentBalance');
+    const elBalStatus = document.getElementById('repBalanceStatus');
+    const elOverdue = document.getElementById('repTotalOverdue');
+    const elOverdueTerms = document.getElementById('repOverdueCreditTerms');
+    const elCard5Title = document.getElementById('repCard5Title');
+    const elCard5Val = document.getElementById('repCard5Value');
+    const elCard5Sub = document.getElementById('repCard5Sub');
+
+    if (elPurchased) elPurchased.textContent = `₹${totalPurchases.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    if (elOrderCount) elOrderCount.textContent = `${orderCount.toLocaleString('en-IN')} Orders`;
+    if (elPaid) elPaid.textContent = `₹${totalPaid.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    if (elRecovery) elRecovery.textContent = `Recovery: ${recoveryRate.toFixed(1)}%`;
+    if (elBalance) elBalance.textContent = `₹${totalPendingBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    if (elBalStatus) elBalStatus.textContent = totalPendingBalance >= 0 ? 'Surplus / Clear' : 'Unpaid Net Balance';
+    if (elOverdue) elOverdue.textContent = `₹${totalOverdue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+
+    if (isSingleCustomer) {
+        const cust = activeCustomers[0];
+        const creditDays = getCreditDays(cust.category);
+        if (elOverdueTerms) elOverdueTerms.textContent = `${creditDays}d Credit Limit`;
+        if (elCard5Title) elCard5Title.textContent = 'Customer Category';
+        if (elCard5Val) elCard5Val.textContent = cust.category;
+        if (elCard5Sub) elCard5Sub.textContent = Math.abs(cust.totalOverdue) < 0.005 ? 'Account Clear (No Overdue)' : `Overdue: ₹${cust.totalOverdue.toFixed(2)}`;
+    } else {
+        const overdueCount = activeCustomers.filter(c => c.totalOverdue < -0.005).length;
+        const clearCount = activeCustomers.length - overdueCount;
+        if (elOverdueTerms) elOverdueTerms.textContent = 'UIC Gold 30d • B2B 60d';
+        if (elCard5Title) elCard5Title.textContent = 'Portfolio Health';
+        if (elCard5Val) elCard5Val.textContent = `${clearCount} / ${activeCustomers.length} Clear`;
+        if (elCard5Sub) elCard5Sub.textContent = `${overdueCount} Accounts Overdue`;
+    }
+
+    // 4. Filter Transactions for Charts & Ledger based on Timeframe
+    let chartTransactions = allTransactions;
+    if (cutoffDate) {
+        chartTransactions = allTransactions.filter(t => t.date && t.date >= cutoffDate);
+    }
+    chartTransactions.sort((a, b) => (a.date || 0) - (b.date || 0));
+
+    // 5. Render Day-Wise Timeline Chart
+    renderTimelineChart(chartTransactions, isSingleCustomer ? activeCustomers[0].name : 'Consolidated Portfolio');
+
+    // 6. Render Secondary Chart
+    renderSecondaryChart(activeCustomers, isSingleCustomer);
+
+    // 7. Render Aging Chart
+    renderAgingChart(activeCustomers);
+
+    // 8. Populate Detailed Day-Wise Ledger Table
+    renderAnalyticsTable(chartTransactions);
+
+    lucide.createIcons();
+}
+
+function renderTimelineChart(transactions, titleContext) {
+    const canvas = document.getElementById('timelineChart');
+    if (!canvas || typeof Chart === 'undefined') return;
+    const ctx = canvas.getContext('2d');
+
+    if (timelineChartInstance) {
+        timelineChartInstance.destroy();
+    }
+
+    // Group transactions by Day
+    const dailyMap = {};
+    let runningBalance = 0;
+
+    transactions.forEach(t => {
+        if (!t.date) return;
+        const dayKey = formatDate(t.date);
+        if (!dailyMap[dayKey]) {
+            dailyMap[dayKey] = {
+                timestamp: t.date.getTime(),
+                dateStr: dayKey,
+                purchases: 0,
+                payments: 0,
+                runningBalance: 0
+            };
+        }
+        if (!t.isAdditive) {
+            dailyMap[dayKey].purchases += t.amount;
+            runningBalance -= t.amount;
+        } else {
+            dailyMap[dayKey].payments += t.amount;
+            runningBalance += t.amount;
+        }
+        dailyMap[dayKey].runningBalance = runningBalance;
+    });
+
+    const sortedDays = Object.values(dailyMap).sort((a, b) => a.timestamp - b.timestamp);
+
+    const maxPoints = 50;
+    const displayDays = sortedDays.length > maxPoints ? sortedDays.slice(sortedDays.length - maxPoints) : sortedDays;
+
+    const labels = displayDays.map(d => d.dateStr);
+    const purchaseData = displayDays.map(d => d.purchases);
+    const paymentData = displayDays.map(d => d.payments);
+    const balanceData = displayDays.map(d => -d.runningBalance);
+
+    const subTitle = document.getElementById('timelineChartSubtitle');
+    if (subTitle) {
+        subTitle.textContent = `Daily purchases, payments, and net due trajectory for ${titleContext} (${displayDays.length} transaction days shown)`;
+    }
+
+    timelineChartInstance = new Chart(ctx, {
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    type: 'bar',
+                    label: 'Purchase (Debit)',
+                    data: purchaseData,
+                    backgroundColor: 'rgba(59, 130, 246, 0.75)',
+                    borderColor: 'rgb(59, 130, 246)',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    order: 2
+                },
+                {
+                    type: 'bar',
+                    label: 'Payment (Credit)',
+                    data: paymentData,
+                    backgroundColor: 'rgba(16, 185, 129, 0.75)',
+                    borderColor: 'rgb(16, 185, 129)',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    order: 3
+                },
+                {
+                    type: 'line',
+                    label: 'Net Due Balance',
+                    data: balanceData,
+                    borderColor: 'rgb(239, 68, 68)',
+                    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                    borderWidth: 2.5,
+                    tension: 0.2,
+                    fill: true,
+                    pointRadius: displayDays.length > 25 ? 2 : 4,
+                    pointHoverRadius: 6,
+                    order: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#0f172a',
+                    titleFont: { family: 'Inter', size: 13, weight: '600' },
+                    bodyFont: { family: 'Inter', size: 12 },
+                    padding: 12,
+                    cornerRadius: 8,
+                    callbacks: {
+                        label: function (context) {
+                            const label = context.dataset.label || '';
+                            const val = context.parsed.y || 0;
+                            return `${label}: ₹${val.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(241, 245, 249, 0.8)' },
+                    ticks: {
+                        font: { family: 'Inter', size: 11 },
+                        color: '#64748b',
+                        maxRotation: 45
+                    }
+                },
+                y: {
+                    grid: { color: 'rgba(241, 245, 249, 0.8)' },
+                    ticks: {
+                        font: { family: 'Inter', size: 11 },
+                        color: '#64748b',
+                        callback: function (val) {
+                            if (val >= 100000) return '₹' + (val / 100000).toFixed(1) + 'L';
+                            if (val >= 1000) return '₹' + (val / 1000).toFixed(0) + 'k';
+                            return '₹' + val;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderSecondaryChart(activeCustomers, isSingleCustomer) {
+    const canvas = document.getElementById('secondaryChart');
+    if (!canvas || typeof Chart === 'undefined') return;
+    const ctx = canvas.getContext('2d');
+
+    if (secondaryChartInstance) {
+        secondaryChartInstance.destroy();
+    }
+
+    const titleEl = document.getElementById('secondaryChartTitle');
+    const subTitleEl = document.getElementById('secondaryChartSubtitle');
+
+    if (isSingleCustomer) {
+        const cust = activeCustomers[0];
+        if (titleEl) titleEl.textContent = `${cust.name}: Monthly Purchases vs Payments`;
+        if (subTitleEl) subTitleEl.textContent = 'Month-by-month order volumes and repayments';
+
+        const monthMap = {};
+        cust.transactions.forEach(t => {
+            if (!t.date) return;
+            const monthKey = t.date.toLocaleString('default', { month: 'short', year: 'numeric' });
+            const sortKey = `${t.date.getFullYear()}-${String(t.date.getMonth() + 1).padStart(2, '0')}`;
+            if (!monthMap[sortKey]) {
+                monthMap[sortKey] = { label: monthKey, purchases: 0, payments: 0 };
+            }
+            if (!t.isAdditive) monthMap[sortKey].purchases += t.amount;
+            else monthMap[sortKey].payments += t.amount;
+        });
+
+        const sortedMonths = Object.keys(monthMap).sort().map(k => monthMap[k]);
+        const labels = sortedMonths.map(m => m.label);
+        const purchases = sortedMonths.map(m => m.purchases);
+        const payments = sortedMonths.map(m => m.payments);
+
+        secondaryChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Purchases (₹)',
+                        data: purchases,
+                        backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                        borderRadius: 4
+                    },
+                    {
+                        label: 'Payments (₹)',
+                        data: payments,
+                        backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                        borderRadius: 4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top', labels: { font: { family: 'Inter', size: 11 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => `${ctx.dataset.label}: ₹${ctx.parsed.y.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+                        }
+                    }
+                },
+                scales: {
+                    x: { ticks: { font: { family: 'Inter', size: 11 } } },
+                    y: {
+                        ticks: {
+                            callback: val => val >= 1000 ? '₹' + (val / 1000).toFixed(0) + 'k' : '₹' + val
+                        }
+                    }
+                }
+            }
+        });
+    } else {
+        if (titleEl) titleEl.textContent = 'Top Customers: Purchases vs Outstanding Due';
+        if (subTitleEl) subTitleEl.textContent = 'Highest volume customer accounts compared against unpaid balance';
+
+        const customerStats = activeCustomers.map(c => {
+            const totalPurchased = c.transactions
+                .filter(t => !t.isAdditive)
+                .reduce((sum, t) => sum + t.amount, 0);
+            return {
+                name: c.name,
+                category: c.category,
+                purchased: totalPurchased,
+                due: Math.abs(c.totalPendingBalance)
+            };
+        });
+
+        customerStats.sort((a, b) => b.purchased - a.purchased);
+        const topList = customerStats.slice(0, 8);
+
+        const labels = topList.map(c => c.name.length > 18 ? c.name.substring(0, 16) + '...' : c.name);
+        const purchaseData = topList.map(c => c.purchased);
+        const dueData = topList.map(c => c.due);
+
+        secondaryChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Total Purchased (₹)',
+                        data: purchaseData,
+                        backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                        borderRadius: 4
+                    },
+                    {
+                        label: 'Outstanding Due (₹)',
+                        data: dueData,
+                        backgroundColor: 'rgba(239, 68, 68, 0.8)',
+                        borderRadius: 4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                plugins: {
+                    legend: { position: 'top', labels: { font: { family: 'Inter', size: 11 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => `${ctx.dataset.label}: ₹${ctx.parsed.x.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            callback: val => val >= 100000 ? '₹' + (val / 100000).toFixed(1) + 'L' : '₹' + (val / 1000).toFixed(0) + 'k'
+                        }
+                    },
+                    y: { ticks: { font: { family: 'Inter', size: 11, weight: '500' } } }
+                }
+            }
+        });
+    }
+}
+
+function renderAgingChart(activeCustomers) {
+    const canvas = document.getElementById('agingChart');
+    if (!canvas || typeof Chart === 'undefined') return;
+    const ctx = canvas.getContext('2d');
+
+    if (agingChartInstance) {
+        agingChartInstance.destroy();
+    }
+
+    let overdue1_30 = 0;
+    let overdue31_60 = 0;
+    let overdue61_90 = 0;
+    let overdue90Plus = 0;
+    let totalPending = 0;
+
+    activeCustomers.forEach(c => {
+        overdue1_30 += Math.abs(c.overdue1_30 || 0);
+        overdue31_60 += Math.abs(c.overdue31_60 || 0);
+        overdue61_90 += Math.abs(c.overdue61_90 || 0);
+        overdue90Plus += Math.abs(c.overdue90Plus || 0);
+        if (c.totalPendingBalance < 0) totalPending += Math.abs(c.totalPendingBalance);
+    });
+
+    const overdueSum = overdue1_30 + overdue31_60 + overdue61_90 + overdue90Plus;
+    const notDue = Math.max(0, totalPending - overdueSum);
+
+    const labels = ['Not Yet Due (Current)', '1–30d Overdue', '31–60d Overdue', '61–90d Overdue', '90+d Overdue'];
+    const data = [notDue, overdue1_30, overdue31_60, overdue61_90, overdue90Plus];
+
+    agingChartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: [
+                    '#10b981',
+                    '#f59e0b',
+                    '#f97316',
+                    '#ef4444',
+                    '#991b1b'
+                ],
+                borderWidth: 2,
+                borderColor: '#ffffff',
+                hoverOffset: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        boxWidth: 12,
+                        padding: 10,
+                        font: { family: 'Inter', size: 11, weight: '500' }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            const val = context.parsed || 0;
+                            const total = data.reduce((a, b) => a + b, 0);
+                            const pct = total > 0 ? ((val / total) * 100).toFixed(1) : '0.0';
+                            return ` ${context.label}: ₹${val.toLocaleString('en-IN', { minimumFractionDigits: 2 })} (${pct}%)`;
+                        }
+                    }
+                }
+            },
+            cutout: '65%'
+        }
+    });
+}
+
+function renderAnalyticsTable(transactions) {
+    const tbody = document.getElementById('analyticsTableBody');
+    if (!tbody) return;
+
+    analyticsLedgerRecords = transactions.slice().reverse();
+    renderAnalyticsTableRows(analyticsLedgerRecords);
+}
+
+function renderAnalyticsTableRows(records) {
+    const tbody = document.getElementById('analyticsTableBody');
+    if (!tbody) return;
+
+    if (!records || records.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 24px; color: var(--text-muted);">No transactions match your current filters.</td></tr>';
+        return;
+    }
+
+    const displayRecords = records.slice(0, 100);
+
+    tbody.innerHTML = '';
+    displayRecords.forEach(item => {
+        const c = item.customer;
+        const dateStr = formatDate(item.date);
+        const orderId = item.orderId || '-';
+        const isPurchase = !item.isAdditive;
+        const purchaseAmt = isPurchase ? `₹${item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-';
+        const paymentAmt = !isPurchase ? `₹${item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-';
+        const balAmt = item.calculatedBalance !== undefined ? `₹${item.calculatedBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-';
+
+        let statusBadge = '';
+        if (isPurchase) {
+            let diffDays = 0;
+            if (item.date) {
+                const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                const dateStart = new Date(item.date.getFullYear(), item.date.getMonth(), item.date.getDate());
+                diffDays = Math.round((todayStart - dateStart) / (1000 * 60 * 60 * 24));
+            }
+            const creditLimit = getCreditDays(c.category);
+            if (diffDays > creditLimit) {
+                statusBadge = `<span class="status-badge status-overdue">Overdue (${diffDays - creditLimit}d)</span>`;
+            } else {
+                statusBadge = `<span class="status-badge status-open">Due in ${creditLimit - diffDays}d</span>`;
+            }
+        } else {
+            statusBadge = `<span class="status-badge" style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0;">Credit Recd</span>`;
+        }
+
+        const catBadge = c.category === 'UIC Gold'
+            ? `<span class="badge-cat badge-gold"><i data-lucide="award" style="width:11px;height:11px;"></i> Gold</span>`
+            : `<span class="badge-cat badge-b2b"><i data-lucide="building-2" style="width:11px;height:11px;"></i> B2B</span>`;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td style="white-space: nowrap;">${dateStr}</td>
+            <td><strong>${orderId}</strong></td>
+            <td><a href="javascript:void(0)" onclick="selectCustomerInAnalytics('${c.key}')" style="color: var(--primary-color); font-weight: 600; text-decoration: none;">${c.name}</a></td>
+            <td>${catBadge}</td>
+            <td style="text-transform: capitalize;">${item.type}</td>
+            <td class="text-right" style="color: ${isPurchase ? '#b91c1c' : 'var(--text-muted)'}; font-weight: 600;">${purchaseAmt}</td>
+            <td class="text-right" style="color: ${!isPurchase ? '#047857' : 'var(--text-muted)'}; font-weight: 600;">${paymentAmt}</td>
+            <td class="text-right" style="font-weight: 700;">${balAmt}</td>
+            <td style="text-align: center;">${statusBadge}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    lucide.createIcons();
+}
+
+function filterAnalyticsTable() {
+    const input = document.getElementById('analyticsTableSearch');
+    const term = input ? input.value.toLowerCase().trim() : '';
+
+    if (!term) {
+        renderAnalyticsTableRows(analyticsLedgerRecords);
+        return;
+    }
+
+    const filtered = analyticsLedgerRecords.filter(item => {
+        return (item.customer.name && item.customer.name.toLowerCase().includes(term)) ||
+               (item.orderId && item.orderId.toLowerCase().includes(term)) ||
+               (item.type && item.type.toLowerCase().includes(term)) ||
+               (formatDate(item.date).includes(term));
+    });
+
+    renderAnalyticsTableRows(filtered);
+}
+
+function selectCustomerInAnalytics(key) {
+    const select = document.getElementById('analyticsCustomerSelect');
+    if (select) {
+        select.value = key;
+        onAnalyticsCustomerChange();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+}
+
+function exportAnalyticsReport(format) {
+    if (!analyticsLedgerRecords || analyticsLedgerRecords.length === 0) {
+        showToast("No analytics data to export", "error");
+        return;
+    }
+
+    const isSingle = currentAnalyticsCustomerKey !== 'all';
+    const cust = isSingle ? customersData.find(c => c.key === currentAnalyticsCustomerKey) : null;
+    const namePrefix = cust ? cust.name.replace(/\s+/g, '_') : 'UIC_Gold_Consolidated';
+    const fileName = `${namePrefix}_Analytics_Report_${new Date().toISOString().slice(0, 10)}`;
+
+    if (format === 'csv') {
+        const headers = ['Date', 'Order ID', 'Customer Name', 'Category', 'Transaction Type', 'Purchase (Debit)', 'Payment (Credit)', 'Balance'];
+        const csvRows = [headers.join(',')];
+
+        analyticsLedgerRecords.forEach(t => {
+            const isPurchase = !t.isAdditive;
+            const row = [
+                `"${formatDate(t.date)}"`,
+                `"${t.orderId || '-'}"`,
+                `"${t.customer.name}"`,
+                `"${t.customer.category}"`,
+                `"${t.type}"`,
+                `"${isPurchase ? t.amount.toFixed(2) : '0.00'}"`,
+                `"${!isPurchase ? t.amount.toFixed(2) : '0.00'}"`,
+                `"${(t.calculatedBalance !== undefined ? t.calculatedBalance : 0).toFixed(2)}"`
+            ];
+            csvRows.push(row.join(','));
+        });
+
+        const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        downloadFile(blob, `${fileName}.csv`);
+        showToast("Analytics CSV exported!");
+    } else if (format === 'pdf') {
+        if (!window.jspdf || !window.jspdf.jsPDF) {
+            showToast("PDF library not ready", "error");
+            return;
+        }
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        doc.setFontSize(18);
+        doc.setTextColor(30, 41, 59);
+        doc.text("UIC Gold - Analytics & Financial Report", 14, 20);
+
+        doc.setFontSize(10);
+        doc.setTextColor(100);
+        doc.text(`Scope: ${cust ? cust.name + ' (' + cust.category + ')' : 'All Customers Consolidated'} | Generated on: ${new Date().toLocaleString()}`, 14, 28);
+
+        const purchases = document.getElementById('repTotalPurchased') ? document.getElementById('repTotalPurchased').textContent : '-';
+        const payments = document.getElementById('repTotalPaid') ? document.getElementById('repTotalPaid').textContent : '-';
+        const balance = document.getElementById('repCurrentBalance') ? document.getElementById('repCurrentBalance').textContent : '-';
+        const overdue = document.getElementById('repTotalOverdue') ? document.getElementById('repTotalOverdue').textContent : '-';
+
+        doc.setFillColor(248, 250, 252);
+        doc.roundedRect(14, 34, 182, 18, 3, 3, 'F');
+        doc.setFontSize(9);
+        doc.setTextColor(51, 65, 85);
+        doc.text(`Purchases: ${purchases}  |  Payments: ${payments}  |  Balance: ${balance}  |  Overdue: ${overdue}`, 18, 45);
+
+        const tableData = analyticsLedgerRecords.slice(0, 60).map(t => {
+            const isPurchase = !t.isAdditive;
+            return [
+                formatDate(t.date),
+                t.orderId || '-',
+                t.customer.name,
+                t.type.toUpperCase(),
+                isPurchase ? t.amount.toFixed(2) : '-',
+                !isPurchase ? t.amount.toFixed(2) : '-',
+                (t.calculatedBalance !== undefined ? t.calculatedBalance.toFixed(2) : '-')
+            ];
+        });
+
+        doc.autoTable({
+            startY: 58,
+            head: [['Date', 'Order ID', 'Customer', 'Type', 'Purchase (₹)', 'Payment (₹)', 'Balance (₹)']],
+            body: tableData,
+            headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold' },
+            styles: { fontSize: 8 },
+            alternateRowStyles: { fillColor: [248, 250, 252] }
+        });
+
+        doc.save(`${fileName}.pdf`);
+        showToast("Analytics PDF report exported!");
+    }
 }
