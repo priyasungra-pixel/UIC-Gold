@@ -2843,7 +2843,8 @@ function copyVendorShortReportWhatsApp() {
    Dashboard Authentication & Password Protection Logic
    ========================================================================== */
 
-const DEFAULT_PASSWORD_HASH = '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9'; // sha256('admin123')
+const DEFAULT_PASSWORD = 'farm@kart';
+const DEFAULT_PASSWORD_HASH = '02a72fe456664e844c6961a1bbc9743c7b46a90e8b3660e69f1719b2b3d1bb7d'; // sha256('farm@kart')
 
 async function sha256(message) {
     const msgBuffer = new TextEncoder().encode(message);
@@ -2857,6 +2858,11 @@ function isAuthenticated() {
 }
 
 function initAuth() {
+    // Migration: if localStorage has old admin123 hash, clear it so new default applies immediately
+    if (localStorage.getItem('uic_dashboard_pwd_hash') === '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9') {
+        localStorage.removeItem('uic_dashboard_pwd_hash');
+    }
+
     const overlay = document.getElementById('authOverlay');
     if (isAuthenticated()) {
         if (overlay) overlay.classList.add('hidden');
@@ -2899,7 +2905,7 @@ async function handleAuthSubmit(event) {
         const storedHash = localStorage.getItem('uic_dashboard_pwd_hash') || DEFAULT_PASSWORD_HASH;
 
         // Check against stored hash OR plaintext fallback for initial default
-        const isMatch = (enteredHash === storedHash) || (enteredPassword === 'admin123' && !localStorage.getItem('uic_dashboard_pwd_hash'));
+        const isMatch = (enteredHash === storedHash) || (enteredPassword === DEFAULT_PASSWORD && !localStorage.getItem('uic_dashboard_pwd_hash'));
 
         if (isMatch) {
             sessionStorage.setItem('uic_auth', 'true');
@@ -2927,7 +2933,7 @@ async function handleAuthSubmit(event) {
     } catch (err) {
         console.error("Auth error:", err);
         // Fallback check
-        if (enteredPassword === 'admin123') {
+        if (enteredPassword === DEFAULT_PASSWORD) {
             sessionStorage.setItem('uic_auth', 'true');
             const overlay = document.getElementById('authOverlay');
             if (overlay) overlay.classList.add('hidden');
@@ -3011,7 +3017,7 @@ async function handleChangePassword(event) {
         const currHash = await sha256(currVal);
         const storedHash = localStorage.getItem('uic_dashboard_pwd_hash') || DEFAULT_PASSWORD_HASH;
 
-        const isCurrentValid = (currHash === storedHash) || (currVal === 'admin123' && !localStorage.getItem('uic_dashboard_pwd_hash'));
+        const isCurrentValid = (currHash === storedHash) || (currVal === DEFAULT_PASSWORD && !localStorage.getItem('uic_dashboard_pwd_hash'));
 
         if (!isCurrentValid) {
             showChangePwdMsg("Current password is incorrect.", "danger");
@@ -3043,10 +3049,10 @@ function showChangePwdMsg(text, type) {
 }
 
 function resetToDefaultPassword() {
-    if (confirm("Reset dashboard password back to default ('admin123')?")) {
+    if (confirm("Reset dashboard password back to default ('farm@kart')?")) {
         localStorage.removeItem('uic_dashboard_pwd_hash');
-        showChangePwdMsg("Password reset to default ('admin123').", "success");
-        showToast("Password reset to default: admin123");
+        showChangePwdMsg("Password reset to default ('farm@kart').", "success");
+        showToast("Password reset to default: farm@kart");
     }
 }
 
