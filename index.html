@@ -18,6 +18,52 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
+    <!-- Dashboard Password Protection / Authentication Lock Screen -->
+    <div id="authOverlay" class="auth-overlay">
+        <div class="auth-card">
+            <div class="auth-header">
+                <div class="auth-logo">
+                    <i data-lucide="shield-check" class="auth-logo-icon"></i>
+                </div>
+                <h2>UIC Gold Dashboard</h2>
+                <p>Security Access Control &bull; Financial Portal</p>
+            </div>
+            
+            <form id="authForm" onsubmit="handleAuthSubmit(event)" class="auth-form">
+                <div class="auth-field">
+                    <label for="authPasswordInput"><i data-lucide="lock" style="width: 14px; height: 14px;"></i> Enter Password to Unlock</label>
+                    <div class="auth-input-group">
+                        <input type="password" id="authPasswordInput" class="auth-input" placeholder="Enter password..." autocomplete="current-password" autofocus required>
+                        <button type="button" class="auth-toggle-pwd" onclick="toggleAuthPasswordVisibility()" title="Show/Hide Password">
+                            <i data-lucide="eye" id="authEyeIcon"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="auth-options">
+                    <label class="auth-remember">
+                        <input type="checkbox" id="authRememberMe">
+                        <span>Remember me on this device (30 days)</span>
+                    </label>
+                </div>
+
+                <div id="authErrorMsg" class="auth-error" style="display: none;"></div>
+
+                <button type="submit" id="authSubmitBtn" class="auth-btn">
+                    <span id="authBtnText"><i data-lucide="unlock" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 6px;"></i> Unlock Dashboard</span>
+                    <span id="authBtnSpinner" style="display: none;"><i data-lucide="loader-2" class="spin-icon"></i> Verifying...</span>
+                </button>
+            </form>
+
+            <div class="auth-footer">
+                <div class="auth-hint">
+                    <i data-lucide="key" style="width: 12px; height: 12px; vertical-align: middle;"></i>
+                    Default Password: <code class="auth-code">admin123</code> <span style="opacity: 0.7;">(Change in Settings)</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="app-container">
         <!-- Sidebar -->
         <aside class="sidebar">
@@ -60,6 +106,9 @@
                         <span class="user-name">Admin</span>
                         <span class="user-role">Manager</span>
                     </div>
+                    <button class="icon-btn" onclick="logout()" title="Lock / Logout Dashboard" style="margin-left: auto; color: var(--text-muted);">
+                        <i data-lucide="log-out"></i>
+                    </button>
                 </div>
             </div>
         </aside>
@@ -75,10 +124,13 @@
                     <button class="icon-btn" title="Refresh Data" id="refreshBtn" onclick="fetchData()">
                         <i data-lucide="refresh-cw"></i>
                     </button>
+                    <button class="icon-btn" title="Lock Dashboard" onclick="logout()">
+                        <i data-lucide="lock"></i>
+                    </button>
                     <button class="icon-btn" title="Notifications">
                         <i data-lucide="bell"></i>
                     </button>
-                    <div class="avatar-sm">A</div>
+                    <div class="avatar-sm" title="Logged in as Admin">A</div>
                 </div>
             </header>
 
@@ -619,8 +671,48 @@
                 <div class="content-header">
                     <div class="title-group">
                         <h1>Settings</h1>
-                        <p class="subtitle">Configure dashboard preferences</p>
+                        <p class="subtitle">Configure dashboard preferences & security access</p>
                     </div>
+                </div>
+
+                <!-- Security & Password Protection -->
+                <div class="card" style="padding: 24px; margin-bottom: 24px;">
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+                        <div style="width: 40px; height: 40px; border-radius: 10px; background: #ecfdf5; color: var(--primary-color); display: flex; align-items: center; justify-content: center;">
+                            <i data-lucide="shield-check" style="width: 22px; height: 22px;"></i>
+                        </div>
+                        <div>
+                            <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--text-main);">Dashboard Security & Password</h3>
+                            <p style="font-size: 0.82rem; color: var(--text-muted);">Manage your access credentials and lock preferences</p>
+                        </div>
+                        <span class="status-badge status-open" style="margin-left: auto; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 4px 10px;">
+                            <i data-lucide="lock" style="width: 12px; height: 12px; vertical-align: middle; margin-right: 4px;"></i> Protected
+                        </span>
+                    </div>
+
+                    <form id="changePasswordForm" onsubmit="handleChangePassword(event)" style="max-width: 440px; display: flex; flex-direction: column; gap: 14px;">
+                        <div class="form-group">
+                            <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-main); margin-bottom: 6px; display: block;">Current Password</label>
+                            <input type="password" id="currentPasswordInput" class="form-input-sm" style="width: 100%; padding: 8px 12px; font-size: 0.9rem;" placeholder="Enter current password" required>
+                        </div>
+                        <div class="form-group">
+                            <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-main); margin-bottom: 6px; display: block;">New Password</label>
+                            <input type="password" id="newPasswordInput" class="form-input-sm" style="width: 100%; padding: 8px 12px; font-size: 0.9rem;" placeholder="Enter new password (min. 4 characters)" minlength="4" required>
+                        </div>
+                        <div class="form-group">
+                            <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-main); margin-bottom: 6px; display: block;">Confirm New Password</label>
+                            <input type="password" id="confirmPasswordInput" class="form-input-sm" style="width: 100%; padding: 8px 12px; font-size: 0.9rem;" placeholder="Confirm new password" minlength="4" required>
+                        </div>
+                        <div id="changePwdMsg" style="font-size: 0.82rem; display: none;"></div>
+                        <div style="display: flex; gap: 10px; margin-top: 4px;">
+                            <button type="submit" class="btn btn-primary" style="padding: 8px 18px;">
+                                <i data-lucide="save" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i> Update Password
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="resetToDefaultPassword()" style="padding: 8px 14px;" title="Reset back to default password (admin123)">
+                                <i data-lucide="rotate-ccw" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i> Reset to Default
+                            </button>
+                        </div>
+                    </form>
                 </div>
                 <div class="card" style="padding: 24px;">
                     <div style="margin-bottom: 24px;">
@@ -917,7 +1009,7 @@
 
     <div id="toastContainer"></div>
 
-    <script src="script.js?v=11"></script>
+    <script src="script.js?v=12"></script>
     <script>
         lucide.createIcons();
     </script>

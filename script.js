@@ -20,7 +20,7 @@ function formatDate(date) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    init();
+    initAuth();
     setupSearch();
     setupSorting();
     setupModal();
@@ -2838,4 +2838,216 @@ function copyVendorShortReportWhatsApp() {
         prompt("Copy WhatsApp Due Notice:", message);
     }
 }
+
+/* ==========================================================================
+   Dashboard Authentication & Password Protection Logic
+   ========================================================================== */
+
+const DEFAULT_PASSWORD_HASH = '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9'; // sha256('admin123')
+
+async function sha256(message) {
+    const msgBuffer = new TextEncoder().encode(message);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function isAuthenticated() {
+    return sessionStorage.getItem('uic_auth') === 'true' || localStorage.getItem('uic_auth_remember') === 'true';
+}
+
+function initAuth() {
+    const overlay = document.getElementById('authOverlay');
+    if (isAuthenticated()) {
+        if (overlay) overlay.classList.add('hidden');
+        init(); // Start data fetch
+    } else {
+        if (overlay) overlay.classList.remove('hidden');
+        const pwdInput = document.getElementById('authPasswordInput');
+        if (pwdInput) {
+            setTimeout(() => pwdInput.focus(), 200);
+        }
+    }
+    lucide.createIcons();
+}
+
+async function handleAuthSubmit(event) {
+    if (event) event.preventDefault();
+
+    const pwdInput = document.getElementById('authPasswordInput');
+    const rememberMe = document.getElementById('authRememberMe');
+    const errorMsg = document.getElementById('authErrorMsg');
+    const authCard = document.querySelector('.auth-card');
+    const btnText = document.getElementById('authBtnText');
+    const btnSpinner = document.getElementById('authBtnSpinner');
+
+    if (!pwdInput) return;
+    const enteredPassword = pwdInput.value.trim();
+
+    if (!enteredPassword) {
+        showAuthError("Please enter a password.");
+        return;
+    }
+
+    if (btnText && btnSpinner) {
+        btnText.style.display = 'none';
+        btnSpinner.style.display = 'inline-flex';
+    }
+
+    try {
+        const enteredHash = await sha256(enteredPassword);
+        const storedHash = localStorage.getItem('uic_dashboard_pwd_hash') || DEFAULT_PASSWORD_HASH;
+
+        // Check against stored hash OR plaintext fallback for initial default
+        const isMatch = (enteredHash === storedHash) || (enteredPassword === 'admin123' && !localStorage.getItem('uic_dashboard_pwd_hash'));
+
+        if (isMatch) {
+            sessionStorage.setItem('uic_auth', 'true');
+            if (rememberMe && rememberMe.checked) {
+                localStorage.setItem('uic_auth_remember', 'true');
+            } else {
+                localStorage.removeItem('uic_auth_remember');
+            }
+
+            if (errorMsg) errorMsg.style.display = 'none';
+            const overlay = document.getElementById('authOverlay');
+            if (overlay) overlay.classList.add('hidden');
+
+            showToast("Welcome to UIC Gold Dashboard!");
+            init(); // Fetch data now that user is authenticated
+        } else {
+            showAuthError("Incorrect password. Please try again.");
+            if (authCard) {
+                authCard.classList.add('shake');
+                setTimeout(() => authCard.classList.remove('shake'), 500);
+            }
+            pwdInput.value = '';
+            pwdInput.focus();
+        }
+    } catch (err) {
+        console.error("Auth error:", err);
+        // Fallback check
+        if (enteredPassword === 'admin123') {
+            sessionStorage.setItem('uic_auth', 'true');
+            const overlay = document.getElementById('authOverlay');
+            if (overlay) overlay.classList.add('hidden');
+            init();
+        } else {
+            showAuthError("Authentication verification error.");
+        }
+    } finally {
+        if (btnText && btnSpinner) {
+            btnText.style.display = 'inline-flex';
+            btnSpinner.style.display = 'none';
+        }
+    }
+}
+
+function showAuthError(msg) {
+    const errorEl = document.getElementById('authErrorMsg');
+    if (errorEl) {
+        errorEl.textContent = msg;
+        errorEl.style.display = 'block';
+    }
+}
+
+function toggleAuthPasswordVisibility() {
+    const pwdInput = document.getElementById('authPasswordInput');
+    const eyeIcon = document.getElementById('authEyeIcon');
+    if (!pwdInput) return;
+
+    if (pwdInput.type === 'password') {
+        pwdInput.type = 'text';
+        if (eyeIcon) eyeIcon.setAttribute('data-lucide', 'eye-off');
+    } else {
+        pwdInput.type = 'password';
+        if (eyeIcon) eyeIcon.setAttribute('data-lucide', 'eye');
+    }
+    lucide.createIcons();
+}
+
+function logout() {
+    sessionStorage.removeItem('uic_auth');
+    localStorage.removeItem('uic_auth_remember');
+
+    const overlay = document.getElementById('authOverlay');
+    if (overlay) {
+        overlay.classList.remove('hidden');
+        const pwdInput = document.getElementById('authPasswordInput');
+        if (pwdInput) {
+            pwdInput.value = '';
+            pwdInput.focus();
+        }
+    }
+    showToast("Dashboard locked. Session ended.");
+    lucide.createIcons();
+}
+
+async function handleChangePassword(event) {
+    if (event) event.preventDefault();
+
+    const currInput = document.getElementById('currentPasswordInput');
+    const newInput = document.getElementById('newPasswordInput');
+    const confInput = document.getElementById('confirmPasswordInput');
+    const msgEl = document.getElementById('changePwdMsg');
+
+    if (!currInput || !newInput || !confInput) return;
+
+    const currVal = currInput.value.trim();
+    const newVal = newInput.value.trim();
+    const confVal = confInput.value.trim();
+
+    if (newVal !== confVal) {
+        showChangePwdMsg("New passwords do not match!", "danger");
+        return;
+    }
+
+    if (newVal.length < 4) {
+        showChangePwdMsg("New password must be at least 4 characters long.", "danger");
+        return;
+    }
+
+    try {
+        const currHash = await sha256(currVal);
+        const storedHash = localStorage.getItem('uic_dashboard_pwd_hash') || DEFAULT_PASSWORD_HASH;
+
+        const isCurrentValid = (currHash === storedHash) || (currVal === 'admin123' && !localStorage.getItem('uic_dashboard_pwd_hash'));
+
+        if (!isCurrentValid) {
+            showChangePwdMsg("Current password is incorrect.", "danger");
+            return;
+        }
+
+        const newHash = await sha256(newVal);
+        localStorage.setItem('uic_dashboard_pwd_hash', newHash);
+
+        currInput.value = '';
+        newInput.value = '';
+        confInput.value = '';
+
+        showChangePwdMsg("Password changed successfully!", "success");
+        showToast("Dashboard password updated!");
+    } catch (err) {
+        console.error(err);
+        showChangePwdMsg("Error saving new password.", "danger");
+    }
+}
+
+function showChangePwdMsg(text, type) {
+    const el = document.getElementById('changePwdMsg');
+    if (!el) return;
+    el.textContent = text;
+    el.style.color = type === 'success' ? 'var(--success)' : 'var(--danger)';
+    el.style.fontWeight = '600';
+    el.style.display = 'block';
+}
+
+function resetToDefaultPassword() {
+    if (confirm("Reset dashboard password back to default ('admin123')?")) {
+        localStorage.removeItem('uic_dashboard_pwd_hash');
+        showChangePwdMsg("Password reset to default ('admin123').", "success");
+        showToast("Password reset to default: admin123");
+    }
+}
+
 
