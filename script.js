@@ -960,6 +960,10 @@ function setupModal() {
         if (event.target == modal) {
             modal.classList.remove('active');
         }
+        const srModal = document.getElementById('vendorShortReportModal');
+        if (event.target == srModal) {
+            srModal.classList.remove('active');
+        }
     };
 }
 
@@ -2202,8 +2206,11 @@ function renderVendorDueTable() {
             <td class="text-right col-due-46-60">${due46_60_html}</td>
             <td class="text-right col-due-60-plus">${due60Plus_html}</td>
             <td class="text-right col-total-due">${totalDueHtml}</td>
-            <td style="text-align: center;">
-                <button class="icon-btn" onclick="openStatement('${v.key}')" title="View Statement & Invoices">
+            <td style="text-align: center; white-space: nowrap;">
+                <button class="icon-btn" onclick="openVendorShortReport('${v.key}')" title="Generate Short Report (Due & Slabs)" style="color: var(--primary-color); margin-right: 4px;">
+                    <i data-lucide="file-check-2"></i>
+                </button>
+                <button class="icon-btn" onclick="openStatement('${v.key}')" title="View Full Statement & Invoices">
                     <i data-lucide="file-text"></i>
                 </button>
             </td>
@@ -2407,6 +2414,428 @@ function exportVendorDue(format) {
     } catch (err) {
         console.error(err);
         showToast("Error exporting vendor report", "error");
+    }
+}
+
+/* ==========================================================================
+   Vendor-Wise Short Report (Details + Total Due + Days-Wise Slabs)
+   ========================================================================== */
+
+let currentShortReportVendor = null;
+
+function populateShortReportVendorDropdown(selectedKey) {
+    const select = document.getElementById('srVendorSelect');
+    if (!select) return;
+
+    if (!vendorAgingData || vendorAgingData.length === 0) {
+        vendorAgingData = calculateAllVendorsAging();
+    }
+
+    select.innerHTML = '';
+    // Sort vendors with due first, then alphabetically
+    const sorted = vendorAgingData.slice().sort((a, b) => {
+        if (b.totalDue !== a.totalDue) return b.totalDue - a.totalDue;
+        return a.name.localeCompare(b.name);
+    });
+
+    sorted.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v.key;
+        const dueText = v.totalDue > 0.005 ? `₹${v.totalDue.toLocaleString('en-IN', { maximumFractionDigits: 0 })} Due` : 'Settled';
+        opt.textContent = `${v.name} (${v.category}) — ${dueText}`;
+        if (v.key === selectedKey) opt.selected = true;
+        select.appendChild(opt);
+    });
+}
+
+function openVendorShortReport(vendorKey) {
+    if (!vendorAgingData || vendorAgingData.length === 0) {
+        vendorAgingData = calculateAllVendorsAging();
+    }
+
+    let vendor = vendorAgingData.find(v => v.key === vendorKey);
+    if (!vendor && vendorAgingData.length > 0) {
+        vendor = vendorAgingData[0];
+    }
+    if (!vendor) return;
+
+    currentShortReportVendor = vendor;
+    populateShortReportVendorDropdown(vendor.key);
+    renderVendorShortReport(vendor);
+
+    const modal = document.getElementById('vendorShortReportModal');
+    if (modal) modal.classList.add('active');
+
+    lucide.createIcons();
+}
+
+function openVendorShortReportModal() {
+    if (!vendorAgingData || vendorAgingData.length === 0) {
+        vendorAgingData = calculateAllVendorsAging();
+    }
+    // Default to the first vendor with overdue or first in list
+    const topDue = vendorAgingData.find(v => v.totalDue > 0.005) || vendorAgingData[0];
+    if (topDue) {
+        openVendorShortReport(topDue.key);
+    }
+}
+
+function closeVendorShortReportModal() {
+    const modal = document.getElementById('vendorShortReportModal');
+    if (modal) modal.classList.remove('active');
+}
+
+function onShortReportVendorSelect(key) {
+    const vendor = vendorAgingData.find(v => v.key === key);
+    if (vendor) {
+        currentShortReportVendor = vendor;
+        renderVendorShortReport(vendor);
+    }
+}
+
+function renderVendorShortReport(v) {
+    if (!v) return;
+
+    // Header info
+    const dateEl = document.getElementById('srGeneratedDate');
+    if (dateEl) dateEl.textContent = `Report Date: ${formatDate(today)}`;
+
+    const nameEl = document.getElementById('srVendorName');
+    if (nameEl) nameEl.textContent = v.name;
+
+    const mobEl = document.getElementById('srVendorMobile');
+    if (mobEl) mobEl.textContent = v.mobile !== 'N/A' ? v.mobile : 'Not Available';
+
+    const addrEl = document.getElementById('srVendorAddressSpan');
+    if (addrEl) addrEl.textContent = v.address ? `• ${v.address}` : '';
+
+    const catBadgeEl = document.getElementById('srVendorCategoryBadge');
+    if (catBadgeEl) {
+        catBadgeEl.innerHTML = v.category === 'B2B'
+            ? `<span class="badge-cat badge-b2b"><i data-lucide="building-2" style="width:12px;height:12px;"></i> B2B Vendor</span>`
+            : `<span class="badge-cat badge-gold"><i data-lucide="award" style="width:12px;height:12px;"></i> UIC Gold Customer</span>`;
+    }
+
+    const totalDueEl = document.getElementById('srTotalDue');
+    if (totalDueEl) {
+        if (v.totalDue > 0.005) {
+            totalDueEl.textContent = `₹ ${v.totalDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            totalDueEl.style.color = 'var(--danger)';
+        } else {
+            totalDueEl.textContent = `₹ 0.00 (All Clear)`;
+            totalDueEl.style.color = 'var(--success)';
+        }
+    }
+
+    const totalPurchEl = document.getElementById('srTotalPurchase');
+    if (totalPurchEl) {
+        totalPurchEl.textContent = `₹ ${v.purchases.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+    // 5 Slab Visual Cards
+    const totalDueForPct = v.totalDue > 0 ? v.totalDue : 1;
+    const p0_15 = ((v.due0_15 / totalDueForPct) * 100).toFixed(1);
+    const p16_30 = ((v.due16_30 / totalDueForPct) * 100).toFixed(1);
+    const p31_45 = ((v.due31_45 / totalDueForPct) * 100).toFixed(1);
+    const p46_60 = ((v.due46_60 / totalDueForPct) * 100).toFixed(1);
+    const p60Plus = ((v.due60Plus / totalDueForPct) * 100).toFixed(1);
+
+    const s0_15 = document.getElementById('srSlab0_15');
+    const s16_30 = document.getElementById('srSlab16_30');
+    const s31_45 = document.getElementById('srSlab31_45');
+    const s46_60 = document.getElementById('srSlab46_60');
+    const s60Plus = document.getElementById('srSlab60Plus');
+
+    if (s0_15) s0_15.textContent = `₹ ${v.due0_15.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    if (s16_30) s16_30.textContent = `₹ ${v.due16_30.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    if (s31_45) s31_45.textContent = `₹ ${v.due31_45.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    if (s46_60) s46_60.textContent = `₹ ${v.due46_60.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    if (s60Plus) s60Plus.textContent = `₹ ${v.due60Plus.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+
+    const sp0_15 = document.getElementById('srSlabPct0_15');
+    const sp16_30 = document.getElementById('srSlabPct16_30');
+    const sp31_45 = document.getElementById('srSlabPct31_45');
+    const sp46_60 = document.getElementById('srSlabPct46_60');
+    const sp60Plus = document.getElementById('srSlabPct60Plus');
+
+    if (sp0_15) sp0_15.textContent = `${p0_15}% of due`;
+    if (sp16_30) sp16_30.textContent = `${p16_30}% of due`;
+    if (sp31_45) sp31_45.textContent = `${p31_45}% of due`;
+    if (sp46_60) sp46_60.textContent = `${p46_60}% of due`;
+    if (sp60Plus) sp60Plus.textContent = `${p60Plus}% of due`;
+
+    // Populate Slab Table
+    const slabTbody = document.getElementById('srSlabTableBody');
+    if (slabTbody) {
+        const slabs = [
+            { name: '0-15 Days Due', range: '0 to 15 Days', amount: v.due0_15, pct: p0_15, status: 'Current Due', badgeCls: 'val-0-15' },
+            { name: '16-30 Days Due', range: '16 to 30 Days', amount: v.due16_30, pct: p16_30, status: 'Normal Due', badgeCls: 'val-16-30' },
+            { name: '31-45 Days Due', range: '31 to 45 Days', amount: v.due31_45, pct: p31_45, status: 'Follow-up Required', badgeCls: 'val-31-45' },
+            { name: '46-60 Days Due', range: '46 to 60 Days', amount: v.due46_60, pct: p46_60, status: 'Overdue (Urgent)', badgeCls: 'val-46-60' },
+            { name: '> 60 Days Due', range: 'More than 60 Days', amount: v.due60Plus, pct: p60Plus, status: 'Critical Overdue', badgeCls: 'val-60-plus' }
+        ];
+
+        let slabRowsHtml = '';
+        slabs.forEach(s => {
+            const amtDisplay = s.amount > 0.005
+                ? `<strong style="font-size: 0.9rem;">₹ ${s.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>`
+                : `<span class="zero-amount" style="color: #94a3b8;">0.00</span>`;
+
+            slabRowsHtml += `
+                <tr>
+                    <td><strong>${s.name}</strong></td>
+                    <td style="color: var(--text-muted);">${s.range}</td>
+                    <td class="text-right">${amtDisplay}</td>
+                    <td class="text-right" style="font-weight: 500;">${s.amount > 0.005 ? s.pct + '%' : '0.0%'}</td>
+                    <td style="text-align: center;">
+                        <span class="aging-due-val ${s.badgeCls}">${s.status}</span>
+                    </td>
+                </tr>
+            `;
+        });
+
+        // Add Summary Row
+        slabRowsHtml += `
+            <tr style="background: #f8fafc; font-weight: 700; border-top: 2px solid var(--border-color);">
+                <td><strong>Total Outstanding Due</strong></td>
+                <td><strong>All Slabs</strong></td>
+                <td class="text-right text-danger"><strong>₹ ${v.totalDue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></td>
+                <td class="text-right"><strong>100.0%</strong></td>
+                <td style="text-align: center;">
+                    ${v.totalDue > 0.005 ? '<span class="status-badge status-overdue">PAYMENT PENDING</span>' : '<span class="status-badge status-open">SETTLED</span>'}
+                </td>
+            </tr>
+        `;
+        slabTbody.innerHTML = slabRowsHtml;
+    }
+
+    // Populate Itemized Invoices Table
+    const invTbody = document.getElementById('srInvoicesTableBody');
+    if (invTbody) {
+        const outstanding = getOutstandingTransactions(v.customerObj);
+        if (outstanding.length === 0) {
+            invTbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--success); font-weight: 600;">No outstanding unpaid invoices. Account is fully settled!</td></tr>';
+        } else {
+            const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            let invRowsHtml = '';
+            outstanding.forEach(t => {
+                let diffDays = 0;
+                if (t.date) {
+                    const dateStart = new Date(t.date.getFullYear(), t.date.getMonth(), t.date.getDate());
+                    diffDays = Math.round((todayStart - dateStart) / (1000 * 60 * 60 * 24));
+                }
+
+                let slabName = '> 60 Days';
+                let slabCls = 'val-60-plus';
+                if (diffDays <= 15) { slabName = '0-15 Days'; slabCls = 'val-0-15'; }
+                else if (diffDays <= 30) { slabName = '16-30 Days'; slabCls = 'val-16-30'; }
+                else if (diffDays <= 45) { slabName = '31-45 Days'; slabCls = 'val-31-45'; }
+                else if (diffDays <= 60) { slabName = '46-60 Days'; slabCls = 'val-46-60'; }
+
+                invRowsHtml += `
+                    <tr>
+                        <td>${formatDate(t.date)}</td>
+                        <td style="font-weight: 500;">${t.orderId || '-'}</td>
+                        <td class="text-right">₹ ${t.amount.toFixed(2)}</td>
+                        <td class="text-right text-danger" style="font-weight: 600;">₹ ${t.outstandingAmount.toFixed(2)}</td>
+                        <td style="text-align: center;">${diffDays} days</td>
+                        <td style="text-align: center;"><span class="aging-due-val ${slabCls}">${slabName}</span></td>
+                    </tr>
+                `;
+            });
+            invTbody.innerHTML = invRowsHtml;
+        }
+    }
+
+    lucide.createIcons();
+}
+
+function downloadVendorShortReportPDF() {
+    if (!currentShortReportVendor) return;
+    const v = currentShortReportVendor;
+
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('portrait');
+
+        const dateStr = formatDate(today);
+        const fileName = `Short_Report_${v.name.replace(/[^a-zA-Z0-9]/g, '_')}_${dateStr}`;
+
+        // Top Brand Header
+        doc.setFontSize(22);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(30, 41, 59);
+        doc.text("farmkart", 20, 20);
+
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'normal');
+        doc.setTextColor(100);
+        doc.text("Farmkart Online Services Pvt. Ltd. | Barwani (M.P.)", 20, 26);
+
+        doc.setFontSize(14);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(15, 23, 42);
+        doc.text("VENDOR PAYMENT DUE & AGING SLAB REPORT", 105, 36, { align: "center" });
+
+        doc.setLineWidth(0.5);
+        doc.setDrawColor(226, 232, 240);
+        doc.line(20, 40, 190, 40);
+
+        // Vendor Details Box
+        doc.setFillColor(248, 250, 252);
+        doc.roundedRect(20, 44, 170, 32, 3, 3, 'F');
+        doc.setDrawColor(203, 213, 225);
+        doc.roundedRect(20, 44, 170, 32, 3, 3, 'S');
+
+        doc.setFontSize(10);
+        doc.setTextColor(71, 85, 105);
+        doc.text("VENDOR DETAILS", 26, 52);
+
+        doc.setFontSize(11);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(15, 23, 42);
+        doc.text(`Name: ${v.name}`, 26, 60);
+
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'normal');
+        doc.setTextColor(51, 65, 85);
+        doc.text(`Mobile: ${v.mobile}   |   Category: ${v.category}`, 26, 68);
+
+        // Right side: Due & Purchase summary
+        doc.setFontSize(9);
+        doc.setTextColor(100);
+        doc.text(`Generated: ${new Date().toLocaleString()}`, 184, 52, { align: "right" });
+
+        doc.setFontSize(9);
+        doc.setTextColor(71, 85, 105);
+        doc.text("Total Outstanding Due:", 140, 60, { align: "right" });
+        doc.setFontSize(13);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(185, 28, 28);
+        doc.text(`INR ${v.totalDue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 184, 60, { align: "right" });
+
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'normal');
+        doc.setTextColor(71, 85, 105);
+        doc.text("Total Purchase:", 140, 68, { align: "right" });
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(15, 23, 42);
+        doc.text(`INR ${v.purchases.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 184, 68, { align: "right" });
+
+        // Days-Wise Aging Slabs Table
+        const totalDueForPct = v.totalDue > 0 ? v.totalDue : 1;
+        const slabData = [
+            ['0-15 Days Due', '0 to 15 Days', v.due0_15.toFixed(2), ((v.due0_15 / totalDueForPct) * 100).toFixed(1) + '%', 'Current Due'],
+            ['16-30 Days Due', '16 to 30 Days', v.due16_30.toFixed(2), ((v.due16_30 / totalDueForPct) * 100).toFixed(1) + '%', 'Normal Due'],
+            ['31-45 Days Due', '31 to 45 Days', v.due31_45.toFixed(2), ((v.due31_45 / totalDueForPct) * 100).toFixed(1) + '%', 'Follow-up Required'],
+            ['46-60 Days Due', '46 to 60 Days', v.due46_60.toFixed(2), ((v.due46_60 / totalDueForPct) * 100).toFixed(1) + '%', 'Overdue (Urgent)'],
+            ['> 60 Days Due', 'More than 60 Days', v.due60Plus.toFixed(2), ((v.due60Plus / totalDueForPct) * 100).toFixed(1) + '%', 'Critical Overdue']
+        ];
+
+        doc.autoTable({
+            startY: 82,
+            head: [['Days-Wise Slab', 'Age Range', 'Due Amount (INR)', '% Share', 'Status']],
+            body: slabData,
+            foot: [['Total Outstanding Due', 'All Slabs', v.totalDue.toFixed(2), '100.0%', v.totalDue > 0.005 ? 'Payment Due' : 'Settled']],
+            headStyles: { fillColor: [16, 185, 129], textColor: [255, 255, 255], fontStyle: 'bold' },
+            footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: 'bold' },
+            columnStyles: {
+                2: { halign: 'right', fontStyle: 'bold' },
+                3: { halign: 'right' },
+                4: { halign: 'center' }
+            },
+            styles: { fontSize: 8.5 }
+        });
+
+        // Itemized Invoices Table
+        const outstanding = getOutstandingTransactions(v.customerObj);
+        if (outstanding.length > 0) {
+            const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            const invData = outstanding.slice(0, 30).map(t => {
+                let diffDays = 0;
+                if (t.date) {
+                    const dateStart = new Date(t.date.getFullYear(), t.date.getMonth(), t.date.getDate());
+                    diffDays = Math.round((todayStart - dateStart) / (1000 * 60 * 60 * 24));
+                }
+                let slabName = '> 60 Days';
+                if (diffDays <= 15) slabName = '0-15 Days';
+                else if (diffDays <= 30) slabName = '16-30 Days';
+                else if (diffDays <= 45) slabName = '31-45 Days';
+                else if (diffDays <= 60) slabName = '46-60 Days';
+
+                return [
+                    formatDate(t.date),
+                    t.orderId || '-',
+                    t.amount.toFixed(2),
+                    t.outstandingAmount.toFixed(2),
+                    `${diffDays}d`,
+                    slabName
+                ];
+            });
+
+            doc.autoTable({
+                startY: doc.lastAutoTable.finalY + 10,
+                head: [['Invoice Date', 'Order ID', 'Order Amount', 'Unpaid Due (INR)', 'Age', 'Assigned Slab']],
+                body: invData,
+                headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold' },
+                columnStyles: {
+                    2: { halign: 'right' },
+                    3: { halign: 'right', fontStyle: 'bold' },
+                    4: { halign: 'center' },
+                    5: { halign: 'center' }
+                },
+                styles: { fontSize: 8 },
+                alternateRowStyles: { fillColor: [248, 250, 252] }
+            });
+        }
+
+        // Footer Note
+        const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 12 : 250;
+        doc.setFontSize(8);
+        doc.setTextColor(148, 163, 184);
+        doc.text("This is an official computer-generated vendor aging & due notice report.", 105, Math.min(finalY, 280), { align: "center" });
+
+        doc.save(`${fileName}.pdf`);
+        showToast("Vendor Short Report PDF Downloaded!");
+    } catch (err) {
+        console.error(err);
+        showToast("Error generating Short Report PDF", "error");
+    }
+}
+
+function copyVendorShortReportWhatsApp() {
+    if (!currentShortReportVendor) return;
+    const v = currentShortReportVendor;
+
+    const message = [
+        `*PAYMENT DUE NOTICE - FARMKART / UIC GOLD*`,
+        `Date: ${formatDate(today)}`,
+        `----------------------------------------`,
+        `*Vendor:* ${v.name}`,
+        `*Mobile:* ${v.mobile}`,
+        `*Category:* ${v.category}`,
+        `*Total Purchases:* ₹ ${v.purchases.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+        `*TOTAL OUTSTANDING DUE:* ₹ ${v.totalDue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+        `----------------------------------------`,
+        `*DAYS-WISE SLAB BREAKDOWN:*`,
+        `• 0–15 Days Due: ₹ ${v.due0_15.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+        `• 16–30 Days Due: ₹ ${v.due16_30.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+        `• 31–45 Days Due: ₹ ${v.due31_45.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+        `• 46–60 Days Due: ₹ ${v.due46_60.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+        `• > 60 Days Due: ₹ ${v.due60Plus.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+        `----------------------------------------`,
+        `Please arrange payment for the pending amount at the earliest.`,
+        `Contact: accounts@farmkart.com | 9407218000`
+    ].join('\n');
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(message).then(() => {
+            showToast("WhatsApp Due Notice copied to clipboard!");
+        }).catch(() => {
+            prompt("Copy WhatsApp Due Notice:", message);
+        });
+    } else {
+        prompt("Copy WhatsApp Due Notice:", message);
     }
 }
 

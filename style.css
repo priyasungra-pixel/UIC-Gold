@@ -1629,6 +1629,96 @@ tbody td {
     border-top: 2px solid var(--border-color);
 }
 
+/* ==========================================================================
+   Vendor Short Report Modal & Slab Styles
+   ========================================================================== */
+.sr-slab-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+}
+
+@media (max-width: 768px) {
+    .sr-slab-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.sr-slab-card {
+    padding: 12px 10px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background: #ffffff;
+    text-align: center;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.sr-slab-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
+}
+
+.sr-slab-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.sr-slab-sub {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.sr-slab-amount {
+    font-size: 0.95rem;
+    font-weight: 800;
+    font-family: 'Outfit', sans-serif;
+    margin: 4px 0 2px 0;
+}
+
+.sr-slab-pct {
+    font-size: 0.68rem;
+    font-weight: 600;
+}
+
+.slab-card-0-15 { border-color: #bfdbfe; background: #eff6ff; }
+.slab-card-0-15 .sr-slab-title { color: #1d4ed8; }
+.slab-card-0-15 .sr-slab-amount { color: #1e40af; }
+.slab-card-0-15 .sr-slab-pct { color: #2563eb; }
+
+.slab-card-16-30 { border-color: #a7f3d0; background: #ecfdf5; }
+.slab-card-16-30 .sr-slab-title { color: #047857; }
+.slab-card-16-30 .sr-slab-amount { color: #065f46; }
+.slab-card-16-30 .sr-slab-pct { color: #059669; }
+
+.slab-card-31-45 { border-color: #fde68a; background: #fffbeb; }
+.slab-card-31-45 .sr-slab-title { color: #b45309; }
+.slab-card-31-45 .sr-slab-amount { color: #92400e; }
+.slab-card-31-45 .sr-slab-pct { color: #d97706; }
+
+.slab-card-46-60 { border-color: #fed7aa; background: #fff7ed; }
+.slab-card-46-60 .sr-slab-title { color: #c2410c; }
+.slab-card-46-60 .sr-slab-amount { color: #9a3412; }
+.slab-card-46-60 .sr-slab-pct { color: #ea580c; }
+
+.slab-card-60-plus { border-color: #fecaca; background: #fef2f2; }
+.slab-card-60-plus .sr-slab-title { color: #dc2626; }
+.slab-card-60-plus .sr-slab-amount { color: #991b1b; }
+.slab-card-60-plus .sr-slab-pct { color: #ef4444; }
+
+.sr-table th {
+    font-size: 0.75rem;
+    padding: 8px 12px;
+    background: #f8fafc;
+}
+
+.sr-table td {
+    font-size: 0.8rem;
+    padding: 8px 12px;
+}
+
 
 
 

@@ -239,6 +239,9 @@
                         <p class="subtitle">Complete purchase and aging analysis (0-15d, 16-30d, 31-45d, 46-60d, >60d)</p>
                     </div>
                     <div class="export-group">
+                        <button class="btn btn-primary" onclick="openVendorShortReportModal()" title="Select a vendor to generate short report">
+                            <i data-lucide="file-check-2"></i> Short Report
+                        </button>
                         <button class="btn btn-secondary" onclick="exportVendorDue('pdf')" title="Export Vendor Aging Schedule as PDF">
                             <i data-lucide="file-text"></i> PDF
                         </button>
@@ -267,7 +270,7 @@
                             <span class="stat-label">Total Purchases</span>
                             <i data-lucide="shopping-cart" class="stat-icon-muted"></i>
                         </div>
-                        <span class="stat-value" id="vendorTotalPurchases">₹ 0.00</span>
+                        <span class="stat-value" id="vendorTotalPurchases">&#8377; 0.00</span>
                         <span class="stat-sublabel" id="vendorPurchaseCount">Consolidated purchases</span>
                     </div>
 
@@ -276,7 +279,7 @@
                             <span class="stat-label">Total Outstanding Due</span>
                             <i data-lucide="alert-circle" class="stat-icon-red"></i>
                         </div>
-                        <span class="stat-value text-danger" id="vendorTotalDue">₹ 0.00</span>
+                        <span class="stat-value text-danger" id="vendorTotalDue">&#8377; 0.00</span>
                         <span class="stat-sublabel" id="vendorDueAccountsCount">0 accounts with due</span>
                     </div>
 
@@ -285,7 +288,7 @@
                             <span class="stat-label">Recent Due (0-30 Days)</span>
                             <i data-lucide="clock" class="stat-icon-muted"></i>
                         </div>
-                        <span class="stat-value" id="vendorRecentDue">₹ 0.00</span>
+                        <span class="stat-value" id="vendorRecentDue">&#8377; 0.00</span>
                         <span class="stat-sublabel" id="vendorRecentRatio">0-15d & 16-30d</span>
                     </div>
 
@@ -294,7 +297,7 @@
                             <span class="stat-label">Critical Due (>45 / >60d)</span>
                             <i data-lucide="flame" class="stat-icon-red"></i>
                         </div>
-                        <span class="stat-value text-danger" id="vendorCriticalDue">₹ 0.00</span>
+                        <span class="stat-value text-danger" id="vendorCriticalDue">&#8377; 0.00</span>
                         <span class="stat-sublabel" id="vendorCriticalRatio">46-60d & >60d</span>
                     </div>
                 </div>
@@ -316,11 +319,11 @@
                         <div class="vbar-segment vbar-60-plus" id="vbar60Plus" style="width: 20%;" title="More than 60 Days Due"></div>
                     </div>
                     <div class="vbar-legend">
-                        <span class="vbar-legend-item"><span class="vbar-dot dot-0-15"></span> 0-15d: <strong id="vleg0_15">₹0</strong></span>
-                        <span class="vbar-legend-item"><span class="vbar-dot dot-16-30"></span> 16-30d: <strong id="vleg16_30">₹0</strong></span>
-                        <span class="vbar-legend-item"><span class="vbar-dot dot-31-45"></span> 31-45d: <strong id="vleg31_45">₹0</strong></span>
-                        <span class="vbar-legend-item"><span class="vbar-dot dot-46-60"></span> 46-60d: <strong id="vleg46_60">₹0</strong></span>
-                        <span class="vbar-legend-item"><span class="vbar-dot dot-60-plus"></span> >60d: <strong id="vleg60Plus">₹0</strong></span>
+                        <span class="vbar-legend-item"><span class="vbar-dot dot-0-15"></span> 0-15d: <strong id="vleg0_15">&#8377;0</strong></span>
+                        <span class="vbar-legend-item"><span class="vbar-dot dot-16-30"></span> 16-30d: <strong id="vleg16_30">&#8377;0</strong></span>
+                        <span class="vbar-legend-item"><span class="vbar-dot dot-31-45"></span> 31-45d: <strong id="vleg31_45">&#8377;0</strong></span>
+                        <span class="vbar-legend-item"><span class="vbar-dot dot-46-60"></span> 46-60d: <strong id="vleg46_60">&#8377;0</strong></span>
+                        <span class="vbar-legend-item"><span class="vbar-dot dot-60-plus"></span> >60d: <strong id="vleg60Plus">&#8377;0</strong></span>
                     </div>
                 </div>
 
@@ -750,9 +753,171 @@
         </div>
     </div>
 
+    <!-- Vendor Short Report Modal (Vendor Details + Total Due + Days-Wise Slabs) -->
+    <div id="vendorShortReportModal" class="modal">
+        <div class="modal-content" style="max-width: 820px;">
+            <div class="modal-header">
+                <div>
+                    <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--text-main);">Vendor Short Report</h2>
+                    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">Vendor details with total due & days-wise aging slab analysis</p>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-primary" onclick="downloadVendorShortReportPDF()" title="Download PDF Short Report">
+                        <i data-lucide="download"></i> Download PDF
+                    </button>
+                    <button class="btn btn-secondary" onclick="copyVendorShortReportWhatsApp()" title="Copy WhatsApp Due Notice">
+                        <i data-lucide="copy"></i> Copy Text
+                    </button>
+                    <button class="icon-btn close-modal" onclick="closeVendorShortReportModal()" title="Close">
+                        <i data-lucide="x"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-body" style="padding: 24px;">
+                <!-- Vendor Selector Bar inside Modal -->
+                <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 20px; background: #f8fafc; padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border-color);">
+                    <label for="srVendorSelect" style="font-size: 0.85rem; font-weight: 600; white-space: nowrap; color: var(--text-main);">
+                        <i data-lucide="user" style="width: 14px; height: 14px; vertical-align: middle;"></i> Select Vendor:
+                    </label>
+                    <select id="srVendorSelect" class="form-select" onchange="onShortReportVendorSelect(this.value)" style="flex: 1; padding: 6px 12px; font-size: 0.88rem;">
+                        <!-- Populated by JS -->
+                    </select>
+                </div>
+
+                <!-- Printable Short Report Area -->
+                <div id="vendorShortReportPrintArea">
+                    <!-- Brand Header -->
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                        <div>
+                            <div style="font-size: 1.6rem; font-weight: 800; font-family: 'Outfit', sans-serif;">
+                                fa<span style="color: #7ab543;">r</span>mkart <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">&bull; UIC GOLD</span>
+                            </div>
+                            <div style="font-size: 0.8rem; font-weight: 600; color: var(--primary-dark); letter-spacing: 0.05em; text-transform: uppercase;">
+                                Vendor Due & Aging Slab Notice
+                            </div>
+                        </div>
+                        <div style="text-align: right; font-size: 0.75rem; color: var(--text-muted); line-height: 1.4;">
+                            <div>Farmkart Online Services Pvt. Ltd.</div>
+                            <div>Barwani, Madhya Pradesh - 451551</div>
+                            <div id="srGeneratedDate" style="font-weight: 500; color: var(--text-main);"></div>
+                        </div>
+                    </div>
+
+                    <!-- Vendor Details Box -->
+                    <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+                            <div>
+                                <span id="srVendorCategoryBadge"></span>
+                                <h3 id="srVendorName" style="font-size: 1.2rem; font-weight: 700; margin-top: 4px; color: var(--text-main);"></h3>
+                                <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 2px;">
+                                    <span>Mobile: <strong id="srVendorMobile" style="color: var(--text-main);"></strong></span>
+                                    <span id="srVendorAddressSpan" style="margin-left: 12px;"></span>
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Total Outstanding Due</div>
+                                <div id="srTotalDue" style="font-size: 1.6rem; font-weight: 800; color: var(--danger); font-family: 'Outfit', sans-serif;">&#8377; 0.00</div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">
+                                    Total Purchase: <strong id="srTotalPurchase" style="color: var(--text-main);">&#8377; 0.00</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 5 Slab Visual Cards Grid -->
+                    <div style="margin-bottom: 20px;">
+                        <h4 style="font-size: 0.85rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; margin-bottom: 10px;">
+                            <i data-lucide="layers" style="width: 14px; height: 14px; vertical-align: middle;"></i> Days-Wise Aging Slabs
+                        </h4>
+                        <div class="sr-slab-grid">
+                            <div class="sr-slab-card slab-card-0-15">
+                                <div class="sr-slab-title">0-15 Days</div>
+                                <div class="sr-slab-sub">Current Due</div>
+                                <div class="sr-slab-amount" id="srSlab0_15">&#8377; 0.00</div>
+                                <div class="sr-slab-pct" id="srSlabPct0_15">0% of due</div>
+                            </div>
+                            <div class="sr-slab-card slab-card-16-30">
+                                <div class="sr-slab-title">16-30 Days</div>
+                                <div class="sr-slab-sub">Normal Due</div>
+                                <div class="sr-slab-amount" id="srSlab16_30">&#8377; 0.00</div>
+                                <div class="sr-slab-pct" id="srSlabPct16_30">0% of due</div>
+                            </div>
+                            <div class="sr-slab-card slab-card-31-45">
+                                <div class="sr-slab-title">31-45 Days</div>
+                                <div class="sr-slab-sub">Follow-up</div>
+                                <div class="sr-slab-amount" id="srSlab31_45">&#8377; 0.00</div>
+                                <div class="sr-slab-pct" id="srSlabPct31_45">0% of due</div>
+                            </div>
+                            <div class="sr-slab-card slab-card-46-60">
+                                <div class="sr-slab-title">46-60 Days</div>
+                                <div class="sr-slab-sub">Overdue</div>
+                                <div class="sr-slab-amount" id="srSlab46_60">&#8377; 0.00</div>
+                                <div class="sr-slab-pct" id="srSlabPct46_60">0% of due</div>
+                            </div>
+                            <div class="sr-slab-card slab-card-60-plus">
+                                <div class="sr-slab-title">> 60 Days</div>
+                                <div class="sr-slab-sub">Critical</div>
+                                <div class="sr-slab-amount" id="srSlab60Plus">&#8377; 0.00</div>
+                                <div class="sr-slab-pct" id="srSlabPct60Plus">0% of due</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Slab Breakdown Summary Table -->
+                    <div style="margin-bottom: 20px;">
+                        <table class="batch-table sr-table" style="box-shadow: none; border: 1px solid var(--border-color); border-radius: 8px; width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th>Days Wise Slab</th>
+                                    <th>Age Range</th>
+                                    <th class="text-right">Due Amount (&#8377;)</th>
+                                    <th class="text-right">% of Total Due</th>
+                                    <th style="text-align: center;">Aging Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="srSlabTableBody">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Outstanding Invoices Contributing to Slabs -->
+                    <div>
+                        <h4 style="font-size: 0.85rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; margin-bottom: 10px;">
+                            <i data-lucide="file-clock" style="width: 14px; height: 14px; vertical-align: middle;"></i> Outstanding Invoices Breakdown
+                        </h4>
+                        <div style="max-height: 220px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
+                            <table class="batch-table sr-table" style="box-shadow: none; width: 100%;">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Order ID</th>
+                                        <th class="text-right">Order Amount (&#8377;)</th>
+                                        <th class="text-right">Unpaid Due (&#8377;)</th>
+                                        <th style="text-align: center;">Age (Days)</th>
+                                        <th style="text-align: center;">Assigned Slab</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="srInvoicesTableBody">
+                                    <!-- Populated by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Footer Note in Report -->
+                    <div style="margin-top: 16px; padding-top: 12px; border-top: 1px dashed var(--border-color); font-size: 0.75rem; color: var(--text-muted); display: flex; justify-content: space-between;">
+                        <span>Computer-generated payment due tracking report.</span>
+                        <span>Contact: accounts@farmkart.com | 9407218000</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="toastContainer"></div>
 
-    <script src="script.js?v=10"></script>
+    <script src="script.js?v=11"></script>
     <script>
         lucide.createIcons();
     </script>
