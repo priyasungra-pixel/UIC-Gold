@@ -417,6 +417,7 @@ h1, h2, h3, .logo {
 
 .table-container {
     width: 100%;
+    overflow-x: auto;
 }
 
 .card {
@@ -1512,6 +1513,122 @@ tbody td {
         grid-template-columns: 1fr;
     }
 }
+
+/* ==========================================================================
+   Vendor Payment Due Tracking System Styles
+   ========================================================================== */
+.vendor-aging-bar-card {
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+}
+
+.vendor-aging-bar {
+    width: 100%;
+    height: 12px;
+    background: #f1f5f9;
+    border-radius: 9999px;
+    overflow: hidden;
+    display: flex;
+}
+
+.vbar-segment {
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+.vbar-0-15 { background-color: #3b82f6; }   /* Blue */
+.vbar-16-30 { background-color: #10b981; }  /* Emerald Green */
+.vbar-31-45 { background-color: #f59e0b; }  /* Amber */
+.vbar-46-60 { background-color: #f97316; }  /* Orange */
+.vbar-60-plus { background-color: #ef4444; }/* Crimson Red */
+
+.vbar-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: 10px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.vbar-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.vbar-legend-item strong {
+    color: var(--text-main);
+    font-weight: 600;
+}
+
+.vbar-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.dot-0-15 { background-color: #3b82f6; }
+.dot-16-30 { background-color: #10b981; }
+.dot-31-45 { background-color: #f59e0b; }
+.dot-46-60 { background-color: #f97316; }
+.dot-60-plus { background-color: #ef4444; }
+
+.vendor-aging-table {
+    width: 100%;
+    min-width: 1050px;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.vendor-aging-table th {
+    white-space: nowrap;
+    padding: 10px 8px;
+    font-size: 0.78rem;
+    letter-spacing: 0.02em;
+}
+
+.vendor-aging-table td {
+    padding: 10px 8px;
+    font-size: 0.82rem;
+    vertical-align: middle;
+}
+
+.col-due-0-15 { color: #1e40af; font-variant-numeric: tabular-nums; }
+.col-due-16-30 { color: #065f46; font-variant-numeric: tabular-nums; }
+.col-due-31-45 { color: #92400e; font-variant-numeric: tabular-nums; }
+.col-due-46-60 { color: #9a3412; font-variant-numeric: tabular-nums; }
+.col-due-60-plus { color: #991b1b; font-variant-numeric: tabular-nums; font-weight: 600; }
+.col-total-due { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.aging-due-val {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 0.82rem;
+}
+.aging-due-val.val-0-15 { background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.aging-due-val.val-16-30 { background-color: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+.aging-due-val.val-31-45 { background-color: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+.aging-due-val.val-46-60 { background-color: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
+.aging-due-val.val-60-plus { background-color: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+
+.vendor-table-footer {
+    background: #f8fafc;
+    border-top: 2px solid var(--border-color);
+    font-weight: 700;
+}
+
+.vendor-table-footer td {
+    padding: 14px 14px;
+    font-size: 0.88rem;
+    color: var(--text-main);
+    border-top: 2px solid var(--border-color);
+}
+
 
 
 

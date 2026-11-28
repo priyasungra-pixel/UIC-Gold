@@ -33,7 +33,7 @@ function setupNavigation() {
 
 function switchView(viewId) {
     // Hide all views
-    const views = ['gold-customer', 'pending-invoices', 'statements', 'reports', 'settings'];
+    const views = ['gold-customer', 'pending-invoices', 'vendor-due', 'statements', 'reports', 'settings'];
     views.forEach(v => {
         const viewEl = document.getElementById(`view-${v}`);
         const navEl = document.getElementById(`nav-${v}`);
@@ -53,6 +53,10 @@ function switchView(viewId) {
         if (viewId === 'gold-customer') {
             searchInput.placeholder = "Search Gold Customer...";
             searchInput.disabled = false;
+        } else if (viewId === 'vendor-due') {
+            searchInput.placeholder = "Search Vendor Name, Mobile...";
+            searchInput.disabled = false;
+            renderVendorDueTable();
         } else if (viewId === 'statements') {
             searchInput.placeholder = "Search batch list...";
             searchInput.disabled = false;
@@ -65,6 +69,8 @@ function switchView(viewId) {
 
     if (viewId === 'pending-invoices') {
         renderPendingInvoicesTable();
+    } else if (viewId === 'vendor-due') {
+        renderVendorDueView();
     } else if (viewId === 'reports') {
         initReportsView();
     }
@@ -488,6 +494,10 @@ window.handleResponse = function (response) {
         const repView = document.getElementById('view-reports');
         if (repView && repView.style.display !== 'none') {
             renderReportsView();
+        }
+        const vendorView = document.getElementById('view-vendor-due');
+        if (vendorView && vendorView.style.display !== 'none') {
+            renderVendorDueView();
         }
         hideLoader();
         showToast("Data synced!");
@@ -969,6 +979,8 @@ function setupSearch() {
             
             if (currentView === 'gold-customer') {
                 applyFilters();
+            } else if (currentView === 'vendor-due') {
+                renderVendorDueTable();
             } else if (currentView === 'statements') {
                 renderBatchTable();
             }
@@ -1917,3 +1929,484 @@ function exportAnalyticsReport(format) {
         showToast("Analytics PDF report exported!");
     }
 }
+
+/* ==========================================================================
+   Vendor Payment Due Tracking System Logic
+   ========================================================================== */
+
+let vendorAgingData = [];
+let vendorCategoryFilter = 'all'; // 'all', 'b2b', 'gold', 'due', 'settled'
+let vendorSortConfig = { column: 'totalDue', direction: 'desc' };
+
+function calculateVendorAging(c) {
+    // 1. Identify total purchases (all debits: !t.isAdditive) and credits (t.isAdditive)
+    let totalPurchases = 0;
+    let totalCredits = 0;
+
+    c.transactions.forEach(t => {
+        if (!t.isAdditive) {
+            totalPurchases += t.amount;
+        } else {
+            totalCredits += t.amount;
+        }
+    });
+
+    // 2. FIFO matching of credits against debits to get outstanding unpaid invoices
+    let remainingCredits = totalCredits;
+    let due0_15 = 0;
+    let due16_30 = 0;
+    let due31_45 = 0;
+    let due46_60 = 0;
+    let due60Plus = 0;
+
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+    // Debits sorted chronologically
+    const debits = c.transactions.filter(t => !t.isAdditive);
+    debits.forEach(debit => {
+        if (remainingCredits >= debit.amount) {
+            remainingCredits -= debit.amount;
+        } else {
+            const unpaidAmount = debit.amount - remainingCredits;
+            remainingCredits = 0;
+
+            if (debit.date) {
+                const dateStart = new Date(debit.date.getFullYear(), debit.date.getMonth(), debit.date.getDate());
+                const diffDays = Math.round((todayStart - dateStart) / (1000 * 60 * 60 * 24));
+
+                if (diffDays <= 15) {
+                    due0_15 += unpaidAmount;
+                } else if (diffDays <= 30) {
+                    due16_30 += unpaidAmount;
+                } else if (diffDays <= 45) {
+                    due31_45 += unpaidAmount;
+                } else if (diffDays <= 60) {
+                    due46_60 += unpaidAmount;
+                } else {
+                    due60Plus += unpaidAmount;
+                }
+            } else {
+                due60Plus += unpaidAmount;
+            }
+        }
+    });
+
+    // If customer has overpaid or is in credit (balance >= 0), totalDue is 0
+    if (c.totalPendingBalance >= 0) {
+        due0_15 = 0;
+        due16_30 = 0;
+        due31_45 = 0;
+        due46_60 = 0;
+        due60Plus = 0;
+    }
+
+    const totalDue = due0_15 + due16_30 + due31_45 + due46_60 + due60Plus;
+
+    return {
+        key: c.key,
+        name: c.name,
+        mobile: c.mobile,
+        address: c.address,
+        category: c.category,
+        purchases: totalPurchases,
+        credits: totalCredits,
+        due0_15: due0_15,
+        due16_30: due16_30,
+        due31_45: due31_45,
+        due46_60: due46_60,
+        due60Plus: due60Plus,
+        totalDue: totalDue,
+        balance: c.totalPendingBalance,
+        customerObj: c
+    };
+}
+
+function calculateAllVendorsAging() {
+    return customersData.map(c => calculateVendorAging(c));
+}
+
+function renderVendorDueView() {
+    vendorAgingData = calculateAllVendorsAging();
+
+    const totalVendors = vendorAgingData.length;
+    const b2bVendors = vendorAgingData.filter(v => v.category === 'B2B');
+    const goldVendors = vendorAgingData.filter(v => v.category === 'UIC Gold');
+    const dueVendors = vendorAgingData.filter(v => v.totalDue > 0.005);
+    const settledVendors = vendorAgingData.filter(v => v.totalDue <= 0.005);
+
+    const totalPurchases = vendorAgingData.reduce((sum, v) => sum + v.purchases, 0);
+    const totalDue = vendorAgingData.reduce((sum, v) => sum + v.totalDue, 0);
+    const total0_15 = vendorAgingData.reduce((sum, v) => sum + v.due0_15, 0);
+    const total16_30 = vendorAgingData.reduce((sum, v) => sum + v.due16_30, 0);
+    const total31_45 = vendorAgingData.reduce((sum, v) => sum + v.due31_45, 0);
+    const total46_60 = vendorAgingData.reduce((sum, v) => sum + v.due46_60, 0);
+    const total60Plus = vendorAgingData.reduce((sum, v) => sum + v.due60Plus, 0);
+
+    const recentDue = total0_15 + total16_30;
+    const criticalDue = total46_60 + total60Plus;
+
+    // Update KPI Cards
+    const totalCountEl = document.getElementById('vendorTotalCount');
+    const ratioTextEl = document.getElementById('vendorRatioText');
+    const totalPurchasesEl = document.getElementById('vendorTotalPurchases');
+    const totalDueEl = document.getElementById('vendorTotalDue');
+    const dueAccountsCountEl = document.getElementById('vendorDueAccountsCount');
+    const recentDueEl = document.getElementById('vendorRecentDue');
+    const criticalDueEl = document.getElementById('vendorCriticalDue');
+
+    if (totalCountEl) totalCountEl.textContent = totalVendors;
+    if (ratioTextEl) ratioTextEl.innerHTML = `${b2bVendors.length} B2B &bull; ${goldVendors.length} Gold`;
+    if (totalPurchasesEl) totalPurchasesEl.textContent = `₹ ${totalPurchases.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (totalDueEl) totalDueEl.textContent = `₹ ${totalDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (dueAccountsCountEl) dueAccountsCountEl.textContent = `${dueVendors.length} accounts with pending due`;
+    if (recentDueEl) recentDueEl.textContent = `₹ ${recentDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (criticalDueEl) criticalDueEl.textContent = `₹ ${criticalDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    // Update Filter Pill Counts
+    const pillAll = document.getElementById('vpillCountAll');
+    const pillB2B = document.getElementById('vpillCountB2B');
+    const pillGold = document.getElementById('vpillCountGold');
+    const pillDue = document.getElementById('vpillCountDue');
+    const pillSettled = document.getElementById('vpillCountSettled');
+
+    if (pillAll) pillAll.textContent = totalVendors;
+    if (pillB2B) pillB2B.textContent = b2bVendors.length;
+    if (pillGold) pillGold.textContent = goldVendors.length;
+    if (pillDue) pillDue.textContent = dueVendors.length;
+    if (pillSettled) pillSettled.textContent = settledVendors.length;
+
+    // Update Aging Visual Progress Bar
+    const sumDue = totalDue > 0 ? totalDue : 1;
+    const pct0_15 = ((total0_15 / sumDue) * 100).toFixed(1);
+    const pct16_30 = ((total16_30 / sumDue) * 100).toFixed(1);
+    const pct31_45 = ((total31_45 / sumDue) * 100).toFixed(1);
+    const pct46_60 = ((total46_60 / sumDue) * 100).toFixed(1);
+    const pct60Plus = ((total60Plus / sumDue) * 100).toFixed(1);
+
+    const b0_15 = document.getElementById('vbar0_15');
+    const b16_30 = document.getElementById('vbar16_30');
+    const b31_45 = document.getElementById('vbar31_45');
+    const b46_60 = document.getElementById('vbar46_60');
+    const b60Plus = document.getElementById('vbar60Plus');
+
+    if (b0_15) { b0_15.style.width = `${pct0_15}%`; b0_15.title = `0-15 Days Due: ₹${total0_15.toLocaleString('en-IN')} (${pct0_15}%)`; }
+    if (b16_30) { b16_30.style.width = `${pct16_30}%`; b16_30.title = `16-30 Days Due: ₹${total16_30.toLocaleString('en-IN')} (${pct16_30}%)`; }
+    if (b31_45) { b31_45.style.width = `${pct31_45}%`; b31_45.title = `31-45 Days Due: ₹${total31_45.toLocaleString('en-IN')} (${pct31_45}%)`; }
+    if (b46_60) { b46_60.style.width = `${pct46_60}%`; b46_60.title = `46-60 Days Due: ₹${total46_60.toLocaleString('en-IN')} (${pct46_60}%)`; }
+    if (b60Plus) { b60Plus.style.width = `${pct60Plus}%`; b60Plus.title = `>60 Days Due: ₹${total60Plus.toLocaleString('en-IN')} (${pct60Plus}%)`; }
+
+    const leg0_15 = document.getElementById('vleg0_15');
+    const leg16_30 = document.getElementById('vleg16_30');
+    const leg31_45 = document.getElementById('vleg31_45');
+    const leg46_60 = document.getElementById('vleg46_60');
+    const leg60Plus = document.getElementById('vleg60Plus');
+
+    if (leg0_15) leg0_15.textContent = `₹${total0_15.toLocaleString('en-IN', { maximumFractionDigits: 0 })} (${pct0_15}%)`;
+    if (leg16_30) leg16_30.textContent = `₹${total16_30.toLocaleString('en-IN', { maximumFractionDigits: 0 })} (${pct16_30}%)`;
+    if (leg31_45) leg31_45.textContent = `₹${total31_45.toLocaleString('en-IN', { maximumFractionDigits: 0 })} (${pct31_45}%)`;
+    if (leg46_60) leg46_60.textContent = `₹${total46_60.toLocaleString('en-IN', { maximumFractionDigits: 0 })} (${pct46_60}%)`;
+    if (leg60Plus) leg60Plus.textContent = `₹${total60Plus.toLocaleString('en-IN', { maximumFractionDigits: 0 })} (${pct60Plus}%)`;
+
+    const summaryText = document.getElementById('vendorAgingSummaryText');
+    if (summaryText) {
+        summaryText.textContent = `Total Due: ₹${totalDue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    }
+
+    renderVendorDueTable();
+}
+
+function renderVendorDueTable() {
+    const tbody = document.getElementById('vendorDueTableBody');
+    const tfoot = document.getElementById('vendorDueTableFooter');
+    if (!tbody) return;
+
+    if (!vendorAgingData || vendorAgingData.length === 0) {
+        vendorAgingData = calculateAllVendorsAging();
+    }
+
+    const searchInput = document.getElementById('searchInput');
+    const term = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+    // Apply Filter Pills
+    let displayList = vendorAgingData.filter(v => {
+        if (vendorCategoryFilter === 'b2b') return v.category === 'B2B';
+        if (vendorCategoryFilter === 'gold') return v.category === 'UIC Gold';
+        if (vendorCategoryFilter === 'due') return v.totalDue > 0.005;
+        if (vendorCategoryFilter === 'settled') return v.totalDue <= 0.005;
+        return true;
+    });
+
+    // Apply Search Term
+    if (term) {
+        displayList = displayList.filter(v => {
+            return (v.name && v.name.toLowerCase().includes(term)) ||
+                   (v.mobile && v.mobile.toLowerCase().includes(term)) ||
+                   (v.address && v.address.toLowerCase().includes(term));
+        });
+    }
+
+    // Apply Sorting
+    const { column, direction } = vendorSortConfig;
+    const factor = direction === 'asc' ? 1 : -1;
+    displayList.sort((a, b) => {
+        let valA = a[column];
+        let valB = b[column];
+        if (typeof valA === 'string') return valA.localeCompare(valB) * factor;
+        return (valA - valB) * factor;
+    });
+
+    tbody.innerHTML = '';
+
+    if (displayList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 30px; color: var(--text-muted);">No vendor accounts match your filter criteria.</td></tr>';
+        if (tfoot) tfoot.innerHTML = '';
+        return;
+    }
+
+    displayList.forEach(v => {
+        const tr = document.createElement('tr');
+
+        const catBadge = v.category === 'B2B'
+            ? `<span class="badge-cat badge-b2b"><i data-lucide="building-2" style="width:12px;height:12px;"></i> B2B</span>`
+            : `<span class="badge-cat badge-gold"><i data-lucide="award" style="width:12px;height:12px;"></i> UIC Gold</span>`;
+
+        function formatDueCell(val, cls) {
+            if (val > 0.005) {
+                return `<span class="aging-due-val ${cls}">₹ ${val.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
+            }
+            return `<span class="zero-amount" style="color: #94a3b8;">0.00</span>`;
+        }
+
+        const due0_15_html = formatDueCell(v.due0_15, 'val-0-15');
+        const due16_30_html = formatDueCell(v.due16_30, 'val-16-30');
+        const due31_45_html = formatDueCell(v.due31_45, 'val-31-45');
+        const due46_60_html = formatDueCell(v.due46_60, 'val-46-60');
+        const due60Plus_html = formatDueCell(v.due60Plus, 'val-60-plus');
+
+        const totalDueHtml = v.totalDue > 0.005
+            ? `<span class="text-danger" style="font-weight: 700;">₹ ${v.totalDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`
+            : `<span style="color: var(--success); font-weight: 600;">0.00</span>`;
+
+        tr.innerHTML = `
+            <td>
+                <div style="cursor: pointer; max-width: 175px;" onclick="openStatement('${v.key}')" title="Click to view detailed statement">
+                    <div style="font-weight: 600; color: var(--text-main); font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${v.name}</div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted);">${v.mobile !== 'N/A' ? v.mobile : ''}</div>
+                </div>
+            </td>
+            <td>${catBadge}</td>
+            <td class="text-right" style="font-weight: 600;">₹ ${v.purchases.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td class="text-right col-due-0-15">${due0_15_html}</td>
+            <td class="text-right col-due-16-30">${due16_30_html}</td>
+            <td class="text-right col-due-31-45">${due31_45_html}</td>
+            <td class="text-right col-due-46-60">${due46_60_html}</td>
+            <td class="text-right col-due-60-plus">${due60Plus_html}</td>
+            <td class="text-right col-total-due">${totalDueHtml}</td>
+            <td style="text-align: center;">
+                <button class="icon-btn" onclick="openStatement('${v.key}')" title="View Statement & Invoices">
+                    <i data-lucide="file-text"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    // Render Grand Totals in Footer
+    if (tfoot) {
+        const sumPurchases = displayList.reduce((s, v) => s + v.purchases, 0);
+        const sum0_15 = displayList.reduce((s, v) => s + v.due0_15, 0);
+        const sum16_30 = displayList.reduce((s, v) => s + v.due16_30, 0);
+        const sum31_45 = displayList.reduce((s, v) => s + v.due31_45, 0);
+        const sum46_60 = displayList.reduce((s, v) => s + v.due46_60, 0);
+        const sum60Plus = displayList.reduce((s, v) => s + v.due60Plus, 0);
+        const sumTotalDue = displayList.reduce((s, v) => s + v.totalDue, 0);
+
+        tfoot.innerHTML = `
+            <tr>
+                <td><strong>Grand Total (${displayList.length} Vendors)</strong></td>
+                <td></td>
+                <td class="text-right"><strong>₹ ${sumPurchases.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
+                <td class="text-right col-due-0-15"><strong>₹ ${sum0_15.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
+                <td class="text-right col-due-16-30"><strong>₹ ${sum16_30.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
+                <td class="text-right col-due-31-45"><strong>₹ ${sum31_45.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
+                <td class="text-right col-due-46-60"><strong>₹ ${sum46_60.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
+                <td class="text-right col-due-60-plus"><strong>₹ ${sum60Plus.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
+                <td class="text-right col-total-due text-danger"><strong>₹ ${sumTotalDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
+                <td></td>
+            </tr>
+        `;
+    }
+
+    updateVendorSortIcons();
+    lucide.createIcons();
+}
+
+function handleVendorSort(column) {
+    if (vendorSortConfig.column === column) {
+        vendorSortConfig.direction = vendorSortConfig.direction === 'asc' ? 'desc' : 'asc';
+    } else {
+        vendorSortConfig.column = column;
+        vendorSortConfig.direction = (column === 'name' || column === 'category') ? 'asc' : 'desc';
+    }
+    renderVendorDueTable();
+}
+
+function updateVendorSortIcons() {
+    const { column, direction } = vendorSortConfig;
+    const icons = document.querySelectorAll('#vendorAgingTable th.sortable i');
+    icons.forEach(i => {
+        i.setAttribute('data-lucide', 'arrow-up-down');
+        i.style.color = 'inherit';
+        i.style.opacity = '0.5';
+    });
+
+    const targetIcon = document.getElementById(`sort-icon-vendor-${column}`);
+    if (targetIcon) {
+        targetIcon.setAttribute('data-lucide', direction === 'asc' ? 'chevron-up' : 'chevron-down');
+        targetIcon.style.color = 'var(--primary-color)';
+        targetIcon.style.opacity = '1';
+    }
+}
+
+function filterVendorCategory(category) {
+    vendorCategoryFilter = category;
+
+    // Update active filter pills
+    document.querySelectorAll('[data-vfilter]').forEach(pill => {
+        if (pill.getAttribute('data-vfilter') === category) {
+            pill.classList.add('active');
+        } else {
+            pill.classList.remove('active');
+        }
+    });
+
+    // Update stat card active indicator if matching
+    const cardTotal = document.getElementById('vStatCardTotal');
+    const cardDue = document.getElementById('vStatCardDue');
+    if (cardTotal) cardTotal.classList.toggle('active', category === 'all');
+    if (cardDue) cardDue.classList.toggle('active', category === 'due');
+
+    renderVendorDueTable();
+}
+
+function exportVendorDue(format) {
+    try {
+        if (!vendorAgingData || vendorAgingData.length === 0) {
+            vendorAgingData = calculateAllVendorsAging();
+        }
+
+        const dateStr = formatDate(today);
+        const fileName = `Vendor_Payment_Due_Report_${dateStr}`;
+
+        const headers = [
+            'Vendor Name',
+            'Category',
+            'Total Purchase (INR)',
+            '0-15 Days Due (INR)',
+            '16-30 Days Due (INR)',
+            '31-45 Days Due (INR)',
+            '46-60 Days Due (INR)',
+            '> 60 Days Due (INR)',
+            'Total Due (INR)'
+        ];
+
+        // Apply current filter to export
+        const exportList = vendorAgingData.filter(v => {
+            if (vendorCategoryFilter === 'b2b') return v.category === 'B2B';
+            if (vendorCategoryFilter === 'gold') return v.category === 'UIC Gold';
+            if (vendorCategoryFilter === 'due') return v.totalDue > 0.005;
+            if (vendorCategoryFilter === 'settled') return v.totalDue <= 0.005;
+            return true;
+        });
+
+        const rows = exportList.map(v => [
+            v.name,
+            v.category,
+            v.purchases.toFixed(2),
+            v.due0_15.toFixed(2),
+            v.due16_30.toFixed(2),
+            v.due31_45.toFixed(2),
+            v.due46_60.toFixed(2),
+            v.due60Plus.toFixed(2),
+            v.totalDue.toFixed(2)
+        ]);
+
+        const sumPurchases = exportList.reduce((s, v) => s + v.purchases, 0);
+        const sum0_15 = exportList.reduce((s, v) => s + v.due0_15, 0);
+        const sum16_30 = exportList.reduce((s, v) => s + v.due16_30, 0);
+        const sum31_45 = exportList.reduce((s, v) => s + v.due31_45, 0);
+        const sum46_60 = exportList.reduce((s, v) => s + v.due46_60, 0);
+        const sum60Plus = exportList.reduce((s, v) => s + v.due60Plus, 0);
+        const sumTotalDue = exportList.reduce((s, v) => s + v.totalDue, 0);
+
+        if (format === 'pdf') {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('landscape');
+
+            doc.setFontSize(18);
+            doc.setFont(undefined, 'bold');
+            doc.text("VENDOR PAYMENT DUE & AGING REPORT", 148, 15, { align: "center" });
+
+            doc.setFontSize(9);
+            doc.setFont(undefined, 'normal');
+            doc.text(`Generated on: ${new Date().toLocaleString()} | Filter: ${vendorCategoryFilter.toUpperCase()} (${exportList.length} Vendors)`, 148, 22, { align: "center" });
+
+            doc.autoTable({
+                startY: 28,
+                head: [headers],
+                body: rows,
+                foot: [[
+                    `Total (${exportList.length})`,
+                    '',
+                    sumPurchases.toFixed(2),
+                    sum0_15.toFixed(2),
+                    sum16_30.toFixed(2),
+                    sum31_45.toFixed(2),
+                    sum46_60.toFixed(2),
+                    sum60Plus.toFixed(2),
+                    sumTotalDue.toFixed(2)
+                ]],
+                headStyles: { fillColor: [16, 185, 129], textColor: [255, 255, 255], fontStyle: 'bold' },
+                footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: 'bold' },
+                columnStyles: {
+                    2: { halign: 'right' },
+                    3: { halign: 'right' },
+                    4: { halign: 'right' },
+                    5: { halign: 'right' },
+                    6: { halign: 'right' },
+                    7: { halign: 'right' },
+                    8: { halign: 'right', fontStyle: 'bold' }
+                },
+                styles: { fontSize: 8 }
+            });
+
+            doc.save(`${fileName}.pdf`);
+            showToast("Vendor Due PDF Exported!");
+        } else {
+            // CSV / Excel
+            const csvRows = [
+                headers.join(','),
+                ...rows.map(r => r.map(val => `"${val}"`).join(',')),
+                [
+                    `"Grand Total"`,
+                    `""`,
+                    `"${sumPurchases.toFixed(2)}"`,
+                    `"${sum0_15.toFixed(2)}"`,
+                    `"${sum16_30.toFixed(2)}"`,
+                    `"${sum31_45.toFixed(2)}"`,
+                    `"${sum46_60.toFixed(2)}"`,
+                    `"${sum60Plus.toFixed(2)}"`,
+                    `"${sumTotalDue.toFixed(2)}"`
+                ].join(',')
+            ];
+            const csvContent = "\uFEFF" + csvRows.join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            downloadFile(blob, `${fileName}.csv`);
+            showToast(`Vendor Due Exported as ${format.toUpperCase()}!`);
+        }
+    } catch (err) {
+        console.error(err);
+        showToast("Error exporting vendor report", "error");
+    }
+}
+

@@ -36,6 +36,10 @@
                     <i data-lucide="file-clock"></i>
                     <span>Pending Invoice</span>
                 </a>
+                <a href="#" class="nav-item" id="nav-vendor-due" onclick="switchView('vendor-due')">
+                    <i data-lucide="truck"></i>
+                    <span>Vendor Payment Due</span>
+                </a>
                 <a href="#" class="nav-item" id="nav-statements" onclick="switchView('statements')">
                     <i data-lucide="file-text"></i>
                     <span>Statements</span>
@@ -223,6 +227,168 @@
                                 <td colspan="9" style="text-align: center; padding: 20px;">No pending invoices found.</td>
                             </tr>
                         </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Vendor Payment Due Tracking View -->
+            <section class="content-body" id="view-vendor-due" style="display: none;">
+                <div class="content-header">
+                    <div class="title-group">
+                        <h1>Vendor Payment Due Tracking</h1>
+                        <p class="subtitle">Complete purchase and aging analysis (0-15d, 16-30d, 31-45d, 46-60d, >60d)</p>
+                    </div>
+                    <div class="export-group">
+                        <button class="btn btn-secondary" onclick="exportVendorDue('pdf')" title="Export Vendor Aging Schedule as PDF">
+                            <i data-lucide="file-text"></i> PDF
+                        </button>
+                        <button class="btn btn-secondary" onclick="exportVendorDue('csv')" title="Export Vendor Aging Data as CSV">
+                            <i data-lucide="file-spreadsheet"></i> CSV
+                        </button>
+                        <button class="btn btn-secondary" onclick="exportVendorDue('excel')" title="Export as Excel">
+                            <i data-lucide="table"></i> Excel
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 5 Stat KPI Cards for Vendor Due -->
+                <div class="dashboard-stats-grid" id="vendorStatsGrid">
+                    <div class="stat-card clickable-stat active" id="vStatCardTotal" onclick="filterVendorCategory('all')" title="View All Vendors">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Total Vendors</span>
+                            <i data-lucide="truck" class="stat-icon-muted"></i>
+                        </div>
+                        <span class="stat-value" id="vendorTotalCount">27</span>
+                        <span class="stat-sublabel" id="vendorRatioText">16 B2B &bull; 11 Gold</span>
+                    </div>
+
+                    <div class="stat-card" id="vStatCardPurchases">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Total Purchases</span>
+                            <i data-lucide="shopping-cart" class="stat-icon-muted"></i>
+                        </div>
+                        <span class="stat-value" id="vendorTotalPurchases">₹ 0.00</span>
+                        <span class="stat-sublabel" id="vendorPurchaseCount">Consolidated purchases</span>
+                    </div>
+
+                    <div class="stat-card urgent clickable-stat" id="vStatCardDue" onclick="filterVendorCategory('due')" title="Click to view Vendors with Due">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Total Outstanding Due</span>
+                            <i data-lucide="alert-circle" class="stat-icon-red"></i>
+                        </div>
+                        <span class="stat-value text-danger" id="vendorTotalDue">₹ 0.00</span>
+                        <span class="stat-sublabel" id="vendorDueAccountsCount">0 accounts with due</span>
+                    </div>
+
+                    <div class="stat-card" id="vStatCardRecent">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Recent Due (0-30 Days)</span>
+                            <i data-lucide="clock" class="stat-icon-muted"></i>
+                        </div>
+                        <span class="stat-value" id="vendorRecentDue">₹ 0.00</span>
+                        <span class="stat-sublabel" id="vendorRecentRatio">0-15d & 16-30d</span>
+                    </div>
+
+                    <div class="stat-card urgent" id="vStatCardCritical">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Critical Due (>45 / >60d)</span>
+                            <i data-lucide="flame" class="stat-icon-red"></i>
+                        </div>
+                        <span class="stat-value text-danger" id="vendorCriticalDue">₹ 0.00</span>
+                        <span class="stat-sublabel" id="vendorCriticalRatio">46-60d & >60d</span>
+                    </div>
+                </div>
+
+                <!-- Aging Visual Distribution Progress Bar -->
+                <div class="card vendor-aging-bar-card" style="padding: 16px 20px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-main);">
+                            <i data-lucide="layers" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i>
+                            Due Aging Distribution Across Buckets
+                        </span>
+                        <span id="vendorAgingSummaryText" style="font-size: 0.8rem; color: var(--text-muted);"></span>
+                    </div>
+                    <div class="vendor-aging-bar">
+                        <div class="vbar-segment vbar-0-15" id="vbar0_15" style="width: 20%;" title="0-15 Days Due"></div>
+                        <div class="vbar-segment vbar-16-30" id="vbar16_30" style="width: 20%;" title="16-30 Days Due"></div>
+                        <div class="vbar-segment vbar-31-45" id="vbar31_45" style="width: 20%;" title="31-45 Days Due"></div>
+                        <div class="vbar-segment vbar-46-60" id="vbar46_60" style="width: 20%;" title="46-60 Days Due"></div>
+                        <div class="vbar-segment vbar-60-plus" id="vbar60Plus" style="width: 20%;" title="More than 60 Days Due"></div>
+                    </div>
+                    <div class="vbar-legend">
+                        <span class="vbar-legend-item"><span class="vbar-dot dot-0-15"></span> 0-15d: <strong id="vleg0_15">₹0</strong></span>
+                        <span class="vbar-legend-item"><span class="vbar-dot dot-16-30"></span> 16-30d: <strong id="vleg16_30">₹0</strong></span>
+                        <span class="vbar-legend-item"><span class="vbar-dot dot-31-45"></span> 31-45d: <strong id="vleg31_45">₹0</strong></span>
+                        <span class="vbar-legend-item"><span class="vbar-dot dot-46-60"></span> 46-60d: <strong id="vleg46_60">₹0</strong></span>
+                        <span class="vbar-legend-item"><span class="vbar-dot dot-60-plus"></span> >60d: <strong id="vleg60Plus">₹0</strong></span>
+                    </div>
+                </div>
+
+                <!-- Vendor Filter & Search Row -->
+                <div class="category-filters-container" style="margin-bottom: 20px;">
+                    <span class="filter-label"><i data-lucide="filter" style="width: 14px; height: 14px;"></i> Filter:</span>
+                    <div class="filter-pills">
+                        <button class="filter-pill active" id="vpillAll" data-vfilter="all" onclick="filterVendorCategory('all')">
+                            All Vendors <span class="pill-count" id="vpillCountAll">27</span>
+                        </button>
+                        <button class="filter-pill" id="vpillB2B" data-vfilter="b2b" onclick="filterVendorCategory('b2b')">
+                            <span class="pill-dot dot-b2b"></span> B2B Vendors <span class="pill-count" id="vpillCountB2B">16</span>
+                        </button>
+                        <button class="filter-pill" id="vpillGold" data-vfilter="gold" onclick="filterVendorCategory('gold')">
+                            <span class="pill-dot dot-gold"></span> UIC Gold <span class="pill-count" id="vpillCountGold">11</span>
+                        </button>
+                        <button class="filter-pill" id="vpillDue" data-vfilter="due" onclick="filterVendorCategory('due')">
+                            <span class="pill-dot dot-overdue"></span> Due Only <span class="pill-count" id="vpillCountDue">15</span>
+                        </button>
+                        <button class="filter-pill" id="vpillSettled" data-vfilter="settled" onclick="filterVendorCategory('settled')">
+                            <span class="pill-dot dot-clear"></span> Settled / Clear <span class="pill-count" id="vpillCountSettled">12</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Main Vendor Payment Due Tracking Table -->
+                <div class="table-container card">
+                    <table class="batch-table vendor-aging-table" id="vendorAgingTable">
+                        <thead>
+                            <tr>
+                                <th class="sortable" onclick="handleVendorSort('name')">
+                                    Vendor Name <i data-lucide="arrow-up-down" id="sort-icon-vendor-name"></i>
+                                </th>
+                                <th class="sortable" onclick="handleVendorSort('category')" style="width: 95px;">
+                                    Category <i data-lucide="arrow-up-down" id="sort-icon-vendor-category"></i>
+                                </th>
+                                <th class="sortable text-right" onclick="handleVendorSort('purchases')">
+                                    Total Purchase <i data-lucide="arrow-up-down" id="sort-icon-vendor-purchases"></i>
+                                </th>
+                                <th class="sortable text-right col-due-0-15" onclick="handleVendorSort('due0_15')">
+                                    0-15 Days Due <i data-lucide="arrow-up-down" id="sort-icon-vendor-due0_15"></i>
+                                </th>
+                                <th class="sortable text-right col-due-16-30" onclick="handleVendorSort('due16_30')">
+                                    16-30 Days Due <i data-lucide="arrow-up-down" id="sort-icon-vendor-due16_30"></i>
+                                </th>
+                                <th class="sortable text-right col-due-31-45" onclick="handleVendorSort('due31_45')">
+                                    31-45 Days Due <i data-lucide="arrow-up-down" id="sort-icon-vendor-due31_45"></i>
+                                </th>
+                                <th class="sortable text-right col-due-46-60" onclick="handleVendorSort('due46_60')">
+                                    46-60 Days Due <i data-lucide="arrow-up-down" id="sort-icon-vendor-due46_60"></i>
+                                </th>
+                                <th class="sortable text-right col-due-60-plus" onclick="handleVendorSort('due60Plus')">
+                                    > 60 Days Due <i data-lucide="arrow-up-down" id="sort-icon-vendor-due60Plus"></i>
+                                </th>
+                                <th class="sortable text-right col-total-due" onclick="handleVendorSort('totalDue')">
+                                    Total Due <i data-lucide="arrow-up-down" id="sort-icon-vendor-totalDue"></i>
+                                </th>
+                                <th style="text-align: center; width: 70px;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="vendorDueTableBody">
+                            <tr>
+                                <td colspan="10" style="text-align: center; padding: 24px;">Loading vendor aging data...</td>
+                            </tr>
+                        </tbody>
+                        <tfoot id="vendorDueTableFooter" class="vendor-table-footer">
+                            <!-- Populated with grand totals by JS -->
+                        </tfoot>
                     </table>
                 </div>
             </section>
@@ -586,7 +752,7 @@
 
     <div id="toastContainer"></div>
 
-    <script src="script.js?v=9"></script>
+    <script src="script.js?v=10"></script>
     <script>
         lucide.createIcons();
     </script>
